@@ -117,6 +117,13 @@ export type UploadDatasetResult = {
   status: string;
 };
 
+export type MysqlRegisterResult = {
+  datasetId: string;
+  sourceType: string;
+  status: string;
+  tableNames: string[];
+};
+
 
 export type AuthTokenPayload = {
   accessToken: string;
