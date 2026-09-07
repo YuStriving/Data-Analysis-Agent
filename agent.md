@@ -283,23 +283,21 @@ Utility-class rule:
 
 ### 11.2 Python runtime
 
-`backend-agent` should remain isolated by package:
+`backend-agent` follows four layers under `src/agent_backend/`:
 
-- `apps/agent_api`
-- `apps/worker`
-- `packages/graph_runtime`
-- `packages/tool_registry`
-- `packages/tool_sql`
-- `packages/tool_python`
-- `packages/tool_chart`
-- `packages/memory`
-- `packages/mcp_hub`
-- `packages/context_hub`
-- `packages/prompt_hub`
-- `packages/guardrails`
-- `packages/evals`
-- `packages/shared_models`
-- `packages/observability`
+- `api`
+  - HTTP and Kafka entry adapters
+- `orchestration`
+  - LangGraph graph, state, node checkpoints, and manual resume logic
+- `capabilities`
+  - reusable `agent_runtime` services and concrete agents
+- `foundation`
+  - typed contracts and Redis, MongoDB, MySQL, and file data source adapters
+
+`capabilities/agent_runtime` owns context engineering, prompt engineering,
+tool calling, memory service, guardrails, observability, and evals.
+`capabilities/data_analysis` owns the current analysis agent and its SQL,
+Python, and chart tools.
 
 ## 12. Self-Evolution Protocol
 

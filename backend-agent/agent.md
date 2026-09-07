@@ -42,36 +42,26 @@ Model-facing integrations should prefer:
 
 ## 3. Package Boundaries
 
-- `apps/agent_api`
-  - internal HTTP entrypoints only
-- `apps/worker`
-  - Kafka consumers and runtime workers
-- `packages/graph_runtime`
-  - graph state, nodes, transitions, node-level checkpoints, and manual resume logic
-- `packages/tool_registry`
-  - tool catalog and policy gates
-- `packages/tool_sql`
-  - schema inspection, SQL planning, validation, execution
-- `packages/tool_python`
-  - analysis and transformation logic
-- `packages/tool_chart`
-  - chart config generation
-- `packages/memory`
-  - Redis hot context and pending queue plus MongoDB durable memory
-- `packages/mcp_hub`
-  - MCP discovery and invocation
-- `packages/context_hub`
-  - task-type-aware context assembly, trimming, and checkpoint-first resume bundles
-- `packages/prompt_hub`
-  - prompt templates and version control
-- `packages/guardrails`
-  - safety and structural validation
-- `packages/evals`
-  - offline evaluation and regression checks
-- `packages/shared_models`
-  - typed models shared across apps and packages
-- `packages/observability`
-  - typed runtime events and daily alert log files
+The runtime root is `src/agent_backend/` and follows four layers:
+
+- `api`
+  - HTTP and Kafka entrypoint adapters only
+- `orchestration`
+  - LangGraph graph, state, transitions, node checkpoints, and manual resume logic
+- `capabilities`
+  - concrete agent capability code and reusable agent runtime services
+- `foundation`
+  - typed contracts and data source adapters consumed by upper layers
+
+`capabilities/agent_runtime` contains reusable services such as context,
+prompt loading, tool calling, memory service, guardrails, observability, and
+evaluation helpers.
+
+`capabilities/data_analysis` owns the current single business agent and its
+concrete SQL, Python, and chart tool implementations.
+
+`foundation/datasource` owns Redis, MongoDB, MySQL, and file data adapters.
+`foundation/contracts` contains cross-layer typed models.
 
 Do not merge these packages into one generic utils directory.
 

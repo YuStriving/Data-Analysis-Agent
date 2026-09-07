@@ -1,5 +1,5 @@
-from graph_runtime.checkpoint import capture_checkpoint, restore_checkpoint
-from graph_runtime.state import AgentState
+from agent_backend.orchestration.checkpoint import capture_checkpoint, restore_checkpoint
+from agent_backend.orchestration.state import AgentState
 
 
 def test_restore_checkpoint_keeps_last_stable_node() -> None:

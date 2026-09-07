@@ -1,4 +1,4 @@
-from shared_models.memory import NodeCheckpointSnapshot
+from agent_backend.foundation.contracts.memory import NodeCheckpointSnapshot
 
 
 def test_snapshot_contains_eight_core_groups() -> None:

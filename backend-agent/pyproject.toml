@@ -29,9 +29,9 @@ dev = [
 package-dir = {"" = "."}
 
 [tool.setuptools.packages.find]
-where = ["apps", "packages"]
+where = ["src"]
 
 [tool.pytest.ini_options]
-pythonpath = ["apps", "packages"]
+pythonpath = ["src"]
 testpaths = ["tests"]
 

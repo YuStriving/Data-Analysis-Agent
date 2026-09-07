@@ -153,9 +153,17 @@ agent-data-platform/
 │        └─ java/com/dataagent/platform/
 ├─ backend-agent/
 │  ├─ pyproject.toml
-│  ├─ apps/
-│  ├─ packages/
-│  ├─ prompts/
+│  ├─ src/agent_backend/
+│  │  ├─ api/
+│  │  │  ├─ http/
+│  │  │  └─ kafka/
+│  │  ├─ orchestration/
+│  │  ├─ capabilities/
+│  │  │  ├─ agent_runtime/
+│  │  │  └─ data_analysis/
+│  │  └─ foundation/
+│  │     ├─ contracts/
+│  │     └─ datasource/
 │  └─ tests/
 ├─ runtime/logs/backend-agent/alerts/
 ├─ infra/
@@ -237,39 +245,35 @@ agent-data-platform/
 
 ## 8. Python Agent 端模块说明
 
-### 8.1 `apps/agent_api`
+### 8.1 `api/http` 与 `api/kafka`
 
 职责：
 
-- 对外暴露内部 HTTP API
-- 接收 Java 端任务调度请求
-- 提供任务状态查询、健康检查、回调入口
+- 仅保留 HTTP 与 Kafka 入口适配
+- HTTP 接收 Java 内网调用，Kafka 订阅任务消息
+- 不承载 Agent 业务编排
 
-### 8.2 `apps/worker`
+### 8.2 `orchestration`
 
 职责：
 
-- 订阅 Kafka 任务消息
-- 驱动 LangGraph 执行
-- 管理失败重试、超时中断和补偿回调
+- 管理 LangGraph 图、状态、节点执行与事件流转
+- 保存节点级快照并支持人工确认后恢复
 
-### 8.3 `packages/*`
+### 8.3 `capabilities`
 
-职责划分：
+职责：
 
-- `graph_runtime`：LangGraph 状态、节点、节点级快照、人工恢复
-- `tool_registry`：工具注册和工具访问策略
-- `tool_sql`：Schema、SQL 规划、只读执行
-- `tool_python`：统计分析和后处理
-- `tool_chart`：图表生成
-- `memory`：Redis 热上下文/待落库队列 + MongoDB 长期记忆与快照
-- `mcp_hub`：MCP Server 发现与调用
-- `context_hub`：任务识别 + Context Engineering + 恢复上下文注入
-- `prompt_hub`：Prompt Engineering
-- `guardrails`：安全策略与结构校验
-- `evals`：回归测试与评测
-- `shared_models`：共享数据模型
-- `observability`：事件与按天告警日志
+- `agent_runtime` 提供上下文工程、Prompt、Tool Calling、记忆服务、Guardrails、可观测性与 Evals
+- `data_analysis` 是当前单 Agent 业务实现，拥有 SQL、Python、Chart 具体工具与 Prompt 模板
+- 后续多 Agent 演进时在 `capabilities/<agent>/` 新增能力目录
+
+### 8.4 `foundation`
+
+职责：
+
+- `contracts` 维护跨层类型契约
+- `datasource` 仅封装 Redis、MongoDB、MySQL、Excel/CSV 等数据源 Adapter
 
 ## 9. Agent 内部推荐节点图
 
@@ -294,26 +298,26 @@ flowchart TD
 
 ## 10. 当前阶段最值得先实现的模块
 
-说明：当前 MVP 分支已先落地基础层所需的 `shared_models / memory / context_hub / graph_runtime / observability` 能力。
+说明：当前 MVP 分支已先落地 `foundation/contracts / foundation/datasource / orchestration / agent_runtime/context / agent_runtime/memory / agent_runtime/observability` 能力。
 
 第一阶段：
 
 1. Java `auth`
 2. Java `dataset`
 3. Java `job`
-4. Python `agent_api + worker`
-5. Python `graph_runtime`
-6. Python `tool_sql`
-7. Python `tool_chart`
-8. Python `context_hub`
-9. Python `prompt_hub`
-10. Python `guardrails`
+4. Python `api/http + api/kafka`
+5. Python `orchestration`
+6. Python `capabilities/data_analysis/tools/sql`
+7. Python `capabilities/data_analysis/tools/chart`
+8. Python `agent_runtime/context`
+9. Python `agent_runtime/prompt`
+10. Python `agent_runtime/guardrails`
 
 第二阶段：
 
-1. Python `memory`
-2. Python `mcp_hub`
-3. Python `evals`
+1. Python `foundation/datasource + agent_runtime/memory`
+2. Python `agent_runtime/tool_calling`
+3. Python `agent_runtime/evals`
 4. Java `audit` 的高级回放与审批
 
 ## 11. 版本依据与参考

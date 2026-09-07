@@ -2,11 +2,11 @@
 
 ## 1. 模块定位
 
-`apps/worker` 负责第二阶段的异步执行调度，是 Python Agent 面向 Kafka 的执行器。
+`api/kafka` 负责第二阶段的异步执行调度，是 Python Agent 面向 Kafka 的执行入口。
 
 ## 2. 当前代码现状
 
-当前 `worker/main.py` 仅完成 `build_graph()` 调用和启动打印，尚未接入 Kafka、重试和回调逻辑。
+当前 `src/agent_backend/api/kafka/worker.py` 仅完成 `build_graph()` 调用和启动打印，尚未接入 Kafka、重试和回调逻辑。
 
 ## 3. 核心职责
 

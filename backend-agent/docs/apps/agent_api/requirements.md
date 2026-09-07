@@ -2,7 +2,7 @@
 
 ## 1. 模块定位
 
-`apps/agent_api` 是 Python Agent 对内服务入口，对应当前 `backend-agent/apps/agent_api/main.py`。
+`api/http` 是 Python Agent 对内 HTTP 服务入口，对应当前 `backend-agent/src/agent_backend/api/http/main.py`。
 
 在初版方案中，它负责接收 Java 下发的执行请求，并以流的形式持续返回执行事件。
 

@@ -1,4 +1,4 @@
-from guardrails.sql import validate_sql
+from agent_backend.capabilities.agent_runtime.guardrails.sql import validate_sql
 
 
 def test_validate_sql_rejects_write_statement() -> None:

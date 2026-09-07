@@ -1,4 +1,4 @@
-from evals.metrics import task_success_rate
+from agent_backend.capabilities.agent_runtime.evals.metrics import task_success_rate
 
 
 def test_task_success_rate() -> None:

@@ -18,7 +18,7 @@
 
 ## 4. MVP 功能需求
 
-1. 支持从 `prompts/` 目录加载模板
+1. 支持从 `src/agent_backend/capabilities/data_analysis/prompts/` 目录加载模板
 2. 支持模板版本管理
 3. 支持拼接系统提示、角色提示和上下文片段
 4. 支持记录实际使用的 prompt 版本

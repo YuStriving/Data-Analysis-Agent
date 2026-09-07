@@ -331,7 +331,7 @@ MVP 不能缺少基础审计，否则无法用于真实数据分析场景。
 
 1. 模块边界与当前目录结构一致
 2. Java 业务边界保持单体分模块，不提前拆微服务
-3. Python Agent 各工具能力按 `packages/*` 独立维护
+3. Python Agent 按 `src/agent_backend` 四层组织，具体工具归属 `capabilities/data_analysis/tools/*`
 4. 关键链路需要具备基础测试
 
 ## 8. MVP 明确不做

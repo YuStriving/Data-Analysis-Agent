@@ -1,6 +1,6 @@
 from fastapi.testclient import TestClient
 
-from agent_api.main import app
+from agent_backend.api.http.main import app
 
 
 def test_health() -> None:

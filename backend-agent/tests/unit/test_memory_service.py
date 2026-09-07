@@ -2,8 +2,8 @@ from __future__ import annotations
 
 import pytest
 
-from memory.service import MemoryService
-from shared_models.memory import PendingMemoryItem
+from agent_backend.capabilities.agent_runtime.memory.service import MemoryService
+from agent_backend.foundation.contracts.memory import PendingMemoryItem
 
 
 class FakeRedisStore:

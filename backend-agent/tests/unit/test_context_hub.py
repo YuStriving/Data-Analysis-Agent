@@ -1,6 +1,6 @@
-from context_hub.builder import build_context
-from shared_models.memory import NodeCheckpointSnapshot
-from shared_models.task import AnalysisTaskRequest
+from agent_backend.capabilities.agent_runtime.context.builder import build_context
+from agent_backend.foundation.contracts.memory import NodeCheckpointSnapshot
+from agent_backend.foundation.contracts.task import AnalysisTaskRequest
 
 
 def test_build_context_uses_trend_policy() -> None:

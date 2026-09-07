@@ -30,7 +30,7 @@ Follow tool constraints, preserve traceability, and do not fabricate metrics.
 
 ## 3. Prompt 来源
 
-1. `prompts/system/base.md`
-2. `prompts/planner/analysis-planner.md`
-3. `prompts/analyst/sql-analyst.md`
-4. `prompts/reviewer/human-review.md`
+1. `src/agent_backend/capabilities/data_analysis/prompts/system/base.md`
+2. `src/agent_backend/capabilities/data_analysis/prompts/planner/analysis-planner.md`
+3. `src/agent_backend/capabilities/data_analysis/prompts/analyst/sql-analyst.md`
+4. `src/agent_backend/capabilities/data_analysis/prompts/reviewer/human-review.md`
