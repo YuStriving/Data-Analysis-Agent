@@ -1,4 +1,17 @@
+from __future__ import annotations
+
+from typing import Literal
+
 from pydantic import BaseModel, Field
+
+
+AnalysisTaskType = Literal[
+    "trend_analysis",
+    "comparison_analysis",
+    "distribution_analysis",
+    "resume_recovery",
+    "unknown",
+]
 
 
 class AnalysisTaskRequest(BaseModel):
@@ -8,4 +21,3 @@ class AnalysisTaskRequest(BaseModel):
     user_id: str
     question: str
     dataset_ids: list[str] = Field(default_factory=list)
-
