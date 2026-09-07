@@ -49,8 +49,8 @@ flowchart LR
     ORCH --> MCP["MCP Client Hub"]
     ORCH --> EVAL["Guardrails / Evals"]
 
-    MEM --> MYSQL
     MEM --> REDIS
+    MEM --> MONGO["MongoDB<br/>Memory / Checkpoints"]
 
     TOOLS --> SQLTOOL["SQL Planner / Guard / Runner"]
     TOOLS --> PYTOOL["Python Analysis"]
@@ -72,9 +72,11 @@ flowchart LR
 3. `job` 模块创建分析任务，将任务上下文写入 MySQL，并向 Kafka 投递事件。
 4. Python Agent 消费任务事件，加载受限上下文后启动 LangGraph。
 5. LangGraph 依次执行 `schema_inspector -> context_builder -> planner -> sql_guard -> query_runner -> python_runner -> chart_builder -> answer_writer`。
-6. 若命中高风险规则，例如跨表敏感字段、超大结果集、疑似越权字段，则进入 `human_review` 节点。
-7. 任务结果、推理轨迹、工具调用记录和审计日志回写 MySQL；热点元数据写入 Redis。
-8. Java 后端通过 SSE 将中间事件和最终结果推送给前端。
+6. 关键节点执行前写入节点级 checkpoint，供异常中断后人工确认恢复。
+7. 若命中高风险规则，例如跨表敏感字段、超大结果集、疑似越权字段，则进入 `human_review` 节点。
+8. 任务结果、推理轨迹、工具调用记录和审计日志回写 MySQL；热点对话上下文写入 Redis 待落库队列与热上下文。
+9. Memory Service 将 Redis 待落库记录幂等写入 MongoDB，MongoDB 提交成功后才清理 Redis。
+10. Java 后端通过 SSE 将中间事件和最终结果推送给前端。
 
 ### 3.2 权限控制原则
 
@@ -94,8 +96,9 @@ flowchart LR
 | Python Agent API | `Python 3.12 + FastAPI` | Agent 服务暴露、任务消费、状态查询、内部回调 |
 | Agent 编排 | `LangGraph` | 有状态工作流、工具调用、记忆、人工中断、可恢复执行 |
 | 模型调用 | `OpenAI Responses API` | 规划、工具选择、结果解释、结构化输出 |
-| 文件与业务存储 | `MySQL 8.4 LTS` | 用户、租户、文件、数据集元数据、任务、审计、长时记忆 |
-| 缓存 | `Redis` | 会话缓存、Schema 缓存、任务热点状态、限流计数、短期记忆缓存 |
+| 文件与业务存储 | `MySQL 8.4 LTS` | 用户、租户、文件、数据集元数据、任务、审计 |
+| Agent 记忆 | `Redis + MongoDB` | Redis 保存待落库队列与热上下文，MongoDB 保存长期对话与节点快照 |
+| 缓存 | `Redis` | 会话缓存、Schema 缓存、任务热点状态、限流计数、待落库队列 |
 | 消息队列 | `Kafka 4.3.x` | 任务投递、状态回传、审计事件、异步解耦 |
 | 图表分析 | `Pandas / Polars / Matplotlib / Plotly` | 数据清洗、统计分析、图表生成 |
 | SQL 执行 | `SQLAlchemy + 驱动` | 统一只读查询执行与连接管理 |
@@ -109,6 +112,7 @@ flowchart LR
 - `Spring Boot`：`3.5.16`
 - `Python`：`3.12`
 - `MySQL`：`8.4 LTS`
+- `MongoDB`：`8.x` 或稳定 LTS 线
 - `Kafka`：`4.3.x`
 - `Redis`：`8.x`
 
@@ -153,10 +157,12 @@ agent-data-platform/
 │  ├─ packages/
 │  ├─ prompts/
 │  └─ tests/
+├─ runtime/logs/backend-agent/alerts/
 ├─ infra/
 │  ├─ docker/
 │  ├─ k8s/
 │  ├─ mysql/
+│  ├─ mongo/
 │  ├─ kafka/
 │  ├─ redis/
 │  └─ observability/
@@ -251,19 +257,19 @@ agent-data-platform/
 
 职责划分：
 
-- `graph_runtime`：LangGraph 状态、节点、恢复执行
+- `graph_runtime`：LangGraph 状态、节点、节点级快照、人工恢复
 - `tool_registry`：工具注册和工具访问策略
 - `tool_sql`：Schema、SQL 规划、只读执行
 - `tool_python`：统计分析和后处理
 - `tool_chart`：图表生成
-- `memory`：短期记忆与长期记忆
+- `memory`：Redis 热上下文/待落库队列 + MongoDB 长期记忆与快照
 - `mcp_hub`：MCP Server 发现与调用
-- `context_hub`：Context Engineering
+- `context_hub`：任务识别 + Context Engineering + 恢复上下文注入
 - `prompt_hub`：Prompt Engineering
 - `guardrails`：安全策略与结构校验
 - `evals`：回归测试与评测
 - `shared_models`：共享数据模型
-- `observability`：事件与指标
+- `observability`：事件与按天告警日志
 
 ## 9. Agent 内部推荐节点图
 
@@ -287,6 +293,8 @@ flowchart TD
 ```
 
 ## 10. 当前阶段最值得先实现的模块
+
+说明：当前 MVP 分支已先落地基础层所需的 `shared_models / memory / context_hub / graph_runtime / observability` 能力。
 
 第一阶段：
 
@@ -315,4 +323,5 @@ flowchart TD
 - MCP：[Intro](https://modelcontextprotocol.io/docs/2026-07-28/getting-started/intro), [Architecture](https://modelcontextprotocol.io/docs/2026-07-28/learn/architecture), [Specification](https://modelcontextprotocol.io/specification/2025-11-25)
 - Kafka：[Kafka Downloads](https://kafka.apache.org/community/downloads/), [Documentation](https://kafka.apache.org/documentation/)
 - MySQL：[MySQL 8.4 Release Notes](https://dev.mysql.com/doc/relnotes/mysql/8.4/en/)
+- MongoDB：[MongoDB Docs](https://www.mongodb.com/docs/)
 - Redis：[Redis Docs](https://redis.io/docs/latest/)

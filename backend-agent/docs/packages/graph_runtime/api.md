@@ -4,77 +4,68 @@
 
 ### `build_graph()`
 
-作用：构建并编译 LangGraph 工作流。
+返回已编译的 LangGraph workflow。
 
-当前返回：
+当前节点顺序：
 
-1. `workflow.compile()` 结果
+```text
+START -> load_context -> checkpoint_node -> write_answer -> END
+```
 
-## 2. 状态模型
+### `capture_checkpoint(state, node_id) -> NodeCheckpointSnapshot`
 
-当前 `AgentState` 建议扩展为：
+捕获当前 `AgentState` 的八个核心字段组，并生成 `snapshot_id`。
+
+### `restore_checkpoint(snapshot) -> AgentState`
+
+从 `NodeCheckpointSnapshot` 恢复 `AgentState`，保留：
+
+1. `node_id` 与 `resume_cursor`
+2. 身份与任务信息
+3. 热上下文和确认事实
+4. 工具执行摘要
+5. 恢复标记与审计序号
+
+## 2. AgentState 关键字段
 
 ```python
 class AgentState(TypedDict, total=False):
     task_id: str
     trace_id: str
-    question: str
-    dataset_ids: list[str]
-    plan: list[str]
-    sql: str
-    warnings: list[str]
-    final_answer: str
+    tenant_id: str
+    user_id: str
+    session_id: str
+    task_type: str
+    node_id: str
+    node_name: str
+    node_status: str
+    resume_cursor: str | None
+    hot_context: dict[str, str]
+    confirmed_facts: list[str]
+    conversation_summary: str
+    last_tool_name: str | None
+    manual_restore_required: bool
     event_seq: int
-    event_sink: Callable[[dict], None]
+    snapshot_id: str
 ```
 
-## 3. 节点输入输出契约
+## 3. 快照事件
 
-### `load_task_context(state) -> state`
-
-输出要求：
-
-1. 写入任务基础信息
-2. 写入上下文摘要
-3. 发出 `task_started`
-
-### `generate_sql(state) -> state`
-
-输出要求：
-
-1. 写入 SQL 文本
-2. 写入 SQL 生成理由
-3. 在生成过程中可多次触发 `sql_delta`
-4. 完成后触发 `sql_ready`
-
-### `build_chart(state) -> state`
-
-输出要求：
-
-1. 写入图表配置对象
-2. 触发 `chart_ready`
-
-### `write_answer(state) -> state`
-
-输出要求：
-
-1. 写入最终结论
-2. 写入警告列表
-3. 在生成过程中可多次触发 `answer_delta`
-
-## 4. 建议事件输出格式
+checkpoint 捕获可转换为内部事件：
 
 ```json
 {
-  "seq": 1,
-  "taskId": "task-demo-001",
-  "traceId": "trace-demo-001",
-  "eventType": "sql_ready",
-  "level": "success",
-  "timestamp": "2026-08-27T10:00:03Z",
-  "payload": {
-    "sql": "SELECT ...",
-    "reasoning": "Generated read-only SQL"
-  }
+  "task_id": "task-1",
+  "trace_id": "trace-1",
+  "event_type": "checkpoint",
+  "timestamp": "2026-09-07T10:00:00+08:00",
+  "snapshot_id": "snapshot-1",
+  "node_id": "generate_sql"
 }
 ```
+
+## 4. 恢复契约
+
+1. 恢复不得自动继续高风险节点。
+2. 恢复必须先经过人工确认。
+3. `resume_cursor` 是恢复入口，不能跨任务直接复用。

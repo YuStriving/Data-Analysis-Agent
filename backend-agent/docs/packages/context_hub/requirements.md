@@ -2,35 +2,32 @@
 
 ## 1. 模块定位
 
-`context_hub` 负责构建任务执行上下文，把任务请求、数据集信息、权限边界和分析约束整理成 Agent 可消费的统一输入。
+`context_hub` 负责判断当前任务类型，并按任务类型选择上下文注入策略，最终输出给模型提示层和编排层使用。
 
-## 2. 当前代码现状
+## 2. 当前能力
 
-当前 `build_context(request)` 只返回：
-
-1. `task_id`
-2. `question`
-3. `dataset_ids`
-
-还缺少 Schema、权限和提示增强信息。
+1. `classify_task` 根据问题关键词识别趋势、对比、分布等任务类型。
+2. `build_context` 在传入 `NodeCheckpointSnapshot` 时强制识别为 `resume_recovery`。
+3. 恢复任务使用 `checkpoint_first` 注入策略。
+4. 输出 `ContextInjectionBundle`，包含身份、数据集、热上下文、确认事实、会话摘要和版本。
 
 ## 3. 核心职责
 
-1. 汇总任务请求
-2. 装配数据集元数据
-3. 装配最小权限上下文
-4. 输出给 Planner 和 Tool 层使用
+1. 任务识别
+2. 策略选择
+3. 快照上下文注入
+4. 输出紧凑且有权限边界的上下文字典
 
-## 4. MVP 功能需求
+## 4. MVP 规则
 
-1. 合并任务请求和数据集摘要
-2. 注入数据集字段信息
-3. 注入角色和可访问表范围
-4. 注入脱敏字段信息
-5. 输出统一上下文字典
+1. 上下文必须包含 `task_id`、`trace_id`、`tenant_id`、`user_id`。
+2. 普通任务优先使用 keyword 推断；恢复任务以快照为准。
+3. `injection_strategy` 由 task type 映射，不允许自由拼接任意上下文。
+4. 输出版本固定为 `v1` 并写入 `injected_context_version`。
 
 ## 5. 验收标准
 
-1. Planner 不需要单独再访问多个来源拼上下文
-2. SQL 工具能基于该上下文做授权校验
-3. 上下文可稳定复用到日志和审计
+1. `resume_recovery` 始终选择 `checkpoint_first`。
+2. 趋势、对比、分布问题能映射到对应策略。
+3. 快照中的热上下文、确认事实和会话摘要能进入 bundle。
+4. 未知问题返回 `unknown / default_bundle`，不扩大数据范围。

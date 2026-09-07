@@ -48,6 +48,10 @@
 14. `backend-agent/docs/packages/prompt_hub/api.md`
 15. `backend-agent/docs/packages/guardrails/requirements.md`
 16. `backend-agent/docs/packages/guardrails/api.md`
+17. `backend-agent/docs/packages/memory/requirements.md`
+18. `backend-agent/docs/packages/memory/api.md`
+19. `backend-agent/docs/packages/observability/requirements.md`
+20. `backend-agent/docs/packages/observability/api.md`
 
 ## 5. 拆分原则
 
