@@ -64,6 +64,7 @@ Unless explicitly approved otherwise, the repository standard is:
 - `LangGraph`
 - `MySQL 8.4`
 - `Redis`
+- `MongoDB`
 - `Kafka`
 - `Next.js`
 - `TypeScript`
@@ -229,9 +230,12 @@ Recommended event types:
 
 ### 10.3 Memory rules
 
-- short-term memory may use runtime state and Redis
-- long-term memory must be durable and scoped
-- memory must include source and timestamp metadata
+- Redis stores only the pending flush queue and hot context for active sessions
+- MongoDB is the durable store for memory turns and checkpoints
+- memory must be scoped by tenant and user and include source and timestamp metadata
+- flush is idempotent, and Redis pending items are cleared only after MongoDB commit
+- snapshots are captured at node level, and restore requires manual confirmation
+- alerts are written to local daily log files only
 
 ### 10.4 MCP rules
 
