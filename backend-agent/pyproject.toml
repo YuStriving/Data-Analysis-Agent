@@ -12,6 +12,7 @@ dependencies = [
   "langgraph>=0.6.6",
   "langchain-openai>=0.3.30",
   "pydantic>=2.11.7",
+  "pymongo>=4.10.1",
   "redis>=6.4.0",
   "sqlalchemy>=2.0.43",
   "uvicorn>=0.35.0"
