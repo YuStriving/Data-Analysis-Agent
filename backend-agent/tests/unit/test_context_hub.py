@@ -1,7 +1,7 @@
 from agent_backend.capabilities.agent_runtime.context.builder import build_context
 from agent_backend.capabilities.agent_runtime.context.builder import ContextBuilder
 from agent_backend.capabilities.agent_runtime.context.policies import resolve_context_policy
-from agent_backend.foundation.contracts.context import (
+from agent_backend.capabilities.agent_runtime.context.contracts import (
     ContextIdentity,
     ContextSource,
     DatasetContext,
@@ -21,6 +21,7 @@ def test_build_context_uses_trend_policy() -> None:
             trace_id="trace-1",
             tenant_id="tenant-1",
             user_id="user-1",
+            session_id="session-1",
             question="Show monthly revenue trend",
             dataset_ids=["dataset-sales"],
         )
@@ -38,6 +39,7 @@ def test_build_context_uses_checkpoint_first_policy_for_resume() -> None:
             trace_id="trace-1",
             tenant_id="tenant-1",
             user_id="user-1",
+            session_id="session-1",
             question="Resume the previous task",
             dataset_ids=["dataset-sales"],
         ),

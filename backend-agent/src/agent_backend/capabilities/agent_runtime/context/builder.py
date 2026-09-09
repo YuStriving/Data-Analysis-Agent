@@ -2,16 +2,17 @@ from __future__ import annotations
 
 from copy import deepcopy
 
-from agent_backend.foundation.contracts.context import (
+from agent_backend.capabilities.agent_runtime.context.contracts import (
     ContextBuildResult,
     ContextBundle,
+    ContextInjectionBundle,
     ContextMeta,
     ContextPolicy,
     ContextSource,
     RuntimeContext,
     SchemaContext,
 )
-from agent_backend.foundation.contracts.memory import ContextInjectionBundle, NodeCheckpointSnapshot
+from agent_backend.foundation.contracts.memory import NodeCheckpointSnapshot
 from agent_backend.foundation.contracts.task import AnalysisTaskRequest
 
 from agent_backend.capabilities.agent_runtime.context.classifier import classify_task
@@ -184,7 +185,7 @@ def build_context(
         trace_id=request.trace_id,
         tenant_id=request.tenant_id,
         user_id=request.user_id,
-        session_id=snapshot.session_id if snapshot is not None else request.task_id,
+        session_id=snapshot.session_id if snapshot is not None else request.session_id,
         dataset_ids=list(request.dataset_ids),
         hot_context={},
         confirmed_facts=[],
