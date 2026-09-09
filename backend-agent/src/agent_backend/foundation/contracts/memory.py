@@ -4,6 +4,32 @@ from datetime import datetime, timezone
 
 from pydantic import BaseModel, Field
 
+from agent_backend.capabilities.agent_runtime.context.contracts import ContextInjectionBundle
+from agent_backend.capabilities.agent_runtime.memory.contracts import (
+    AnswerGeneratedPayload,
+    ChartBuiltPayload,
+    ChartSummary,
+    DatasetResolvedPayload,
+    FlushResult,
+    HotContext,
+    KeyMetric,
+    MemoryEvent,
+    MemoryEventPayload,
+    MemoryEventType,
+    MemoryScope,
+    MemoryTurn,
+    PendingMemoryItem,
+    QueryExecutedPayload,
+    QuestionReceivedPayload,
+    RecentTurn,
+    ResultSummarizedPayload,
+    SchemaLoadedPayload,
+    SqlGeneratedPayload,
+    SqlRepairedPayload,
+    SqlValidatedPayload,
+    TaskFailedPayload,
+)
+
 
 class MemoryIdentity(BaseModel):
     tenant_id: str
@@ -158,49 +184,38 @@ class NodeCheckpointSnapshot(BaseModel):
         )
 
 
-class MemoryTurn(BaseModel):
-    turn_id: str
-    tenant_id: str
-    user_id: str
-    session_id: str
-    task_id: str
-    trace_id: str
-    role: str
-    content: str
-    created_at: datetime
-
-
-class PendingMemoryItem(BaseModel):
-    turn: MemoryTurn
-    scope_key: str
-    pending_seq: int
-
-    @classmethod
-    def demo(cls) -> "PendingMemoryItem":
-        turn = MemoryTurn(
-            turn_id="turn-1",
-            tenant_id="tenant-1",
-            user_id="user-1",
-            session_id="session-1",
-            task_id="task-1",
-            trace_id="trace-1",
-            role="assistant",
-            content="monthly revenue trend",
-            created_at=datetime(2026, 9, 7, 0, 0, 0, tzinfo=timezone.utc),
-        )
-        return cls(turn=turn, scope_key="tenant-1:user-1:session-1", pending_seq=1)
-
-
-class ContextInjectionBundle(BaseModel):
-    task_type: str
-    injection_strategy: str
-    task_id: str
-    trace_id: str
-    tenant_id: str
-    user_id: str
-    session_id: str
-    dataset_ids: list[str] = Field(default_factory=list)
-    hot_context: dict[str, str] = Field(default_factory=dict)
-    confirmed_facts: list[str] = Field(default_factory=list)
-    conversation_summary: str = ""
-    injected_context_version: str = "v1"
+__all__ = [
+    "AnswerGeneratedPayload",
+    "AuditState",
+    "ChartBuiltPayload",
+    "ChartSummary",
+    "ContextInjectionBundle",
+    "ContextState",
+    "DatasetResolvedPayload",
+    "ExecutionState",
+    "FlushResult",
+    "GraphState",
+    "HotContext",
+    "KeyMetric",
+    "MemoryEvent",
+    "MemoryEventPayload",
+    "MemoryEventType",
+    "MemoryIdentity",
+    "MemoryScope",
+    "MemoryTurn",
+    "NodeCheckpointSnapshot",
+    "PendingMemoryItem",
+    "QueryExecutedPayload",
+    "QuestionReceivedPayload",
+    "RecentTurn",
+    "RecoveryState",
+    "ResultSummarizedPayload",
+    "SchemaLoadedPayload",
+    "SnapshotCore",
+    "SqlGeneratedPayload",
+    "SqlRepairedPayload",
+    "SqlValidatedPayload",
+    "TaskFailedPayload",
+    "TaskState",
+    "ToolState",
+]

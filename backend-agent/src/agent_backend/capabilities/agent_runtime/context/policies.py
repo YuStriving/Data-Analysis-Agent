@@ -1,6 +1,6 @@
 from __future__ import annotations
 
-from agent_backend.foundation.contracts.context import ContextPolicy
+from agent_backend.capabilities.agent_runtime.context.contracts import ContextPolicy
 from agent_backend.foundation.contracts.task import AnalysisTaskType
 
 
