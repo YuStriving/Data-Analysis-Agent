@@ -106,28 +106,481 @@ Prompt 不应硬编码在业务节点里。每次执行应记录实际使用的�
 
 ### 4.4 tool_calling
 
-负责工具注册、工具参数校验、工具调用分发和工具结果规范化。
+负责工具注册、工具参数校验、基础权限校验、工具调用分发、超时控制、
+错误包装、工具结果规范化和工具调用观测。
+
+`tool_calling` 当前只面向 Agent 和 workflow node 提供工具调用能力，不作为
+面向终端用户或外部系统的开放接口。它的核心目标不是维护一个“工具大全”，
+而是提供一套统一、可校验、可追踪、可演进的工具调用协议。
+
+#### 4.4.1 职责边界
+
+Tool 本身应保持纯工具能力：只接收明确参数、执行明确动作、返回明确结果。
+具体 Tool Adapter 不应反向依赖 `context`、`memory`、`prompt`、
+`lifecycle` 等 Agent runtime 模块，也不应感知完整 Agent 编排过程。
+
+`tool_calling` 负责：
+
+1. 注册当前系统允许被 Agent 或 workflow node 调用的工具。
+2. 暴露工具定义，供 workflow 调度或后续 Model Tool Calling 注入工具
+   schema。
+3. 校验工具调用参数是否符合工具声明的 `input_schema`。
+4. 在统一入口完成基础权限校验，包括 Agent、node、租户、用户、数据集范围
+   和数据源类型。
+5. 将工具调用分发给具体 Tool Adapter。
+6. 统一处理超时、异常捕获和错误码包装。
+7. 将工具原始返回规范化为统一的 `ToolCallResult`。
+8. 记录工具调用观测事件，包括 trace、耗时、成功状态、错误码和结果摘要。
+
+`tool_calling` 不负责：
+
+1. 不负责决定业务流程。何时调用哪个工具由 `lifecycle`、graph 或具体
+   Agent 节点决定。
+2. 不负责生成 SQL。SQL 生成属于 Prompt、模型节点和业务 Agent 的职责。
+3. 不负责完整 SQL 安全策略。SQL 只读校验、表字段范围、危险语句拦截等
+   属于 `guardrails`，`tool_calling` 只负责在执行前接入安全校验。
+4. 不负责底层数据源连接细节。MySQL、文件读取、DuckDB relation 注册等
+   底层能力由 `foundation` 或具体 Tool Adapter 封装。
+5. 不负责对话记忆、checkpoint 或 evals 数据沉淀，只向这些模块提供可记录
+   的调用事件和结果摘要。
+
+推荐关系：
+
+```text
+Agent / workflow node
+-> ToolCallingRuntime.call(ToolCallRequest)
+   -> ToolRegistry
+   -> parameter validator
+   -> permission checker
+   -> guardrails hook
+   -> Tool Adapter
+   -> result normalizer
+   -> observability event
+```
 
 核心信息：
 
 1. 工具名称和描述
 2. 输入参数 schema
 3. 输出结果 schema
-4. 工具所属 Agent
-5. 所需权限和数据源类型
-6. 超时配置
-7. 重试配置
-8. 是否需要人工审核
+4. 工具版本
+5. 工具所属 Agent
+6. 允许调用的节点
+7. 所需权限和数据源类型
+8. 超时配置
+9. 重试配置
+10. 是否需要人工审核
+11. 观测日志脱敏策略
+
+#### 4.4.2 ToolDefinition v1
+
+`ToolDefinition` 描述工具的稳定元数据。参数 schema 建议参考 OpenAI
+tool/function calling 的 JSON Schema 风格，便于后续向 Model Tool Calling
+演进；内部调用请求和执行结果仍使用项目自定义的 `ToolCallRequest` 和
+`ToolCallResult`。
+
+MVP 字段：
+
+```text
+name
+version
+description
+input_schema
+output_schema
+allowed_agents
+allowed_nodes
+supported_dataset_types
+required_permissions
+timeout_ms
+retry_policy
+log_policy
+```
+
+可选字段：
+
+```text
+requires_review
+tags
+risk_level
+```
+
+字段说明：
+
+1. `name`：工具唯一名称，例如 `mysql.query_executor`。
+2. `version`：工具协议版本，例如 `v1`，用于历史回放、checkpoint 和 evals。
+3. `description`：工具说明，同时服务开发者和后续模型工具描述。
+4. `input_schema`：输入参数 schema，用于执行前参数校验。
+5. `output_schema`：成功结果 schema，用于结果规范化前后的校验。
+6. `allowed_agents`：允许调用该工具的 Agent 列表。
+7. `allowed_nodes`：允许调用该工具的 workflow node 列表。工具既可由 node
+   调用，也可由 Agent 直接调用；Agent 直接调用时 `node_id` 可为空。
+8. `supported_dataset_types`：工具支持的数据源类型。
+9. `required_permissions`：调用该工具所需的基础权限。
+10. `timeout_ms`：单次调用默认超时时间。
+11. `retry_policy`：工具层原样重试策略。SQL 查询类工具 MVP 默认不在工具层
+    自动重试，SQL 修复重试由 workflow 控制。
+12. `log_policy`：日志脱敏和采样策略。
+
+#### 4.4.3 ToolCallRequest v1
+
+`ToolCallRequest` 描述某一次工具调用如何发起。它应携带足够的运行时身份、
+链路和权限范围，但不携带完整 Prompt、Memory、Checkpoint 或底层连接配置。
+
+字段：
+
+```text
+tool_call_id
+tool_name
+tool_version
+agent_name
+agent_version
+node_id
+task_id
+trace_id
+session_id
+tenant_id
+user_id
+dataset_scope
+args
+timeout_ms
+```
+
+字段分组：
+
+1. 调用标识：`tool_call_id`、`tool_name`、`tool_version`。
+2. 调用来源：`agent_name`、`agent_version`、`node_id`。
+3. 链路追踪：`task_id`、`trace_id`、`session_id`。
+4. 权限上下文：`tenant_id`、`user_id`、`dataset_scope`。
+5. 工具入参：`args`。
+6. 执行控制：`timeout_ms`。
+
+`node_id` 为可选字段。workflow node 调用时填入具体节点，例如
+`execute_sql`；Agent 自主调用工具时可为空。
+
+#### 4.4.4 ToolCallResult v1
+
+`ToolCallResult` 描述某一次工具调用如何结束。
+
+字段：
+
+```text
+tool_call_id
+tool_name
+tool_version
+success
+status
+data
+error
+metadata
+```
+
+成功和失败约束：
+
+```text
+success = true:
+data != null
+error = null
+
+success = false:
+data = null
+error != null
+```
+
+`metadata` 保存轻量执行信息，例如 `latency_ms`、`attempt`、`max_attempts`、
+`dataset_id`、`dataset_type`、`row_count`、`truncated`、`input_hash` 和
+`output_summary`。业务结果只放入 `data`，失败原因只放入 `error`。
+
+#### 4.4.5 Tool 接口
+
+具体工具实现只暴露最小接口：
+
+```text
+definition()
+execute(args)
+```
+
+`execute(args)` 只接收工具参数，不接收完整 `ToolCallRequest`。权限、超时、
+日志、错误包装和结果规范化由 `ToolCallingRuntime` 统一处理。
+
+`ToolCallingRuntime` 面向 Agent 和 workflow node 暴露：
+
+```text
+list_tools(agent_name=None)
+get_tool(tool_name, tool_version=None)
+call(request)
+```
+
+`ToolRegistry` 面向 `tool_calling` 内部使用：
+
+```text
+register(tool)
+get(name, version=None)
+list()
+```
+
+Agent 不应绕过 `ToolCallingRuntime.call()` 直接执行 Tool Adapter，否则会
+绕过参数校验、基础权限校验、超时、错误包装和观测日志。
+
+#### 4.4.6 调用流程
+
+`ToolCallingRuntime.call()` 的 MVP 流程：
+
+```text
+1. 接收 ToolCallRequest
+2. 记录 tool_call_started 事件
+3. 根据 tool_name + tool_version 解析 Tool
+4. 校验 tool 是否存在
+5. 校验 agent / node 是否允许调用
+6. 校验 dataset_scope 和 dataset_type
+7. 按 input_schema 校验 args
+8. 如有需要，调用 guardrails hook
+9. 按 timeout_ms 执行 Tool Adapter
+10. 校验工具原始结果是否符合 output_schema
+11. 包装成功 ToolCallResult
+12. 记录 tool_call_finished 事件
+13. 返回 ToolCallResult
+```
+
+所有可结构化表达的失败都应返回 `ToolCallResult(success=false)`，避免向
+Agent 暴露零散异常。
+
+#### 4.4.7 status 与错误码
+
+`status` 表示结果状态大类，`error.code` 表示失败原因细类。
+
+MVP `status`：
+
+```text
+succeeded
+validation_failed
+permission_denied
+guardrail_rejected
+timeout
+failed
+```
+
+错误码映射：
+
+```text
+TOOL_NOT_FOUND -> validation_failed
+TOOL_VERSION_NOT_FOUND -> validation_failed
+TOOL_ARGUMENT_INVALID -> validation_failed
+TOOL_RESULT_INVALID -> validation_failed
+
+TOOL_PERMISSION_DENIED -> permission_denied
+TOOL_AGENT_NOT_ALLOWED -> permission_denied
+TOOL_NODE_NOT_ALLOWED -> permission_denied
+TOOL_DATASET_NOT_ALLOWED -> permission_denied
+TOOL_DATASET_TYPE_UNSUPPORTED -> permission_denied
+TOOL_REVIEW_REQUIRED -> permission_denied
+
+GUARDRAIL_REJECTED -> guardrail_rejected
+TOOL_TIMEOUT -> timeout
+TOOL_EXECUTION_FAILED -> failed
+```
+
+错误对象包含：
+
+```text
+code
+message
+detail
+retryable
+```
+
+`retryable` 只表示同一工具、同一参数原样重试是否可能成功。它不同于
+workflow recoverable。后续 workflow 可基于 `error.code` 和 `error.detail`
+增加恢复策略映射，例如 SQL 修复、重建参数、追问用户或切换数据集。
+
+#### 4.4.8 观测日志与脱敏
+
+MVP 记录两个事件：
+
+```text
+tool_call_started
+tool_call_finished
+```
+
+`tool_call_started` 建议字段：
+
+```text
+event_type
+tool_call_id
+tool_name
+tool_version
+agent_name
+agent_version
+node_id
+task_id
+trace_id
+session_id
+tenant_id
+user_id
+dataset_id
+dataset_type
+started_at
+timeout_ms
+args_hash
+input_summary
+```
+
+`tool_call_finished` 建议字段：
+
+```text
+event_type
+tool_call_id
+tool_name
+tool_version
+agent_name
+agent_version
+node_id
+task_id
+trace_id
+session_id
+tenant_id
+user_id
+dataset_id
+dataset_type
+started_at
+finished_at
+latency_ms
+success
+status
+error_code
+error_message
+error_detail
+retryable
+attempt
+max_attempts
+truncated
+row_count
+output_summary
+```
+
+`tool_call_finished` 表示调用已经结束，不表示调用成功。成功或失败由
+`success` 表示；失败原因必须通过 `error_code`、`error_message`、
+`error_detail` 和 `retryable` 记录。
+
+日志策略：
+
+1. SQL 原文可以记录，但应进入专门的 Agent event / audit 存储，不进入普通
+   应用日志。
+2. SQL 记录应绑定 `tenant_id`、`user_id`、`task_id` 和 `trace_id`。
+3. 查询结果默认不完整记录，只记录 `columns`、`row_count`、`truncated`、
+   `sample_rows` 和 `result_summary`。
+4. `sample_rows` 默认最多 20 行。
+5. 不默认记录 `full_rows`。
+6. 不记录完整本地文件路径，只记录 `file_ref`、`dataset_id`、`file_name`、
+   `file_ext`、`file_size` 和 `sheet_names` 等非敏感摘要。
+7. 不记录数据库连接信息、连接字符串、账号、密码、token、host、port 等。
+
+推荐 `log_policy`：
+
+```json
+{
+  "record_sql": true,
+  "record_sql_redacted": true,
+  "record_args": false,
+  "record_args_hash": true,
+  "record_result_sample": true,
+  "result_sample_limit": 20,
+  "record_full_result": false,
+  "record_output_summary": true,
+  "record_file_path": false,
+  "record_connection_info": false
+}
+```
 
 首期工具需要覆盖：
 
-1. MySQL schema reader
-2. MySQL query executor
-3. CSV schema reader
-4. CSV query executor
-5. Excel schema reader
-6. Excel query executor
-7. chart spec builder
+1. `mysql.schema_reader`
+2. `mysql.query_executor`
+3. `file.relation_normalizer`
+4. `relation.query_executor`
+5. `chart.spec_builder`
+
+#### 4.4.9 MVP 工具职责
+
+`mysql.schema_reader`：
+
+1. 职责：读取授权 MySQL 数据集的 schema，并转换成统一 RelationSchema 风格。
+2. 输入：`dataset_id`、`table_names`、`include_sample_values`、`max_tables`、
+   `max_columns_per_table`、`sample_rows`。
+3. 输出：`dataset_id`、`dataset_type`、`relations`。
+4. 不负责：不生成 SQL、不执行 SQL、不判断用户问题意图、不做跨 dataset
+   自动 join、不返回大量原始数据。
+
+MySQL 的 RelationSchema 映射规则：
+
+```text
+relation_name = 原始表名
+column_name = 原始字段名
+display_name = 表或字段备注；没有备注时使用原名
+original_name = 原始表名或字段名
+```
+
+`mysql.query_executor`：
+
+1. 职责：在授权 MySQL 数据集上执行已校验的只读 SQL，并返回统一 QueryResult。
+2. 输入：`dataset_id`、`sql`、`max_rows`、`relation_names`。
+3. 输出：`dataset_id`、`dataset_type`、`columns`、`rows`、`row_count`、
+   `truncated`、`execution_time_ms`。
+4. 不负责：不生成 SQL、不修复 SQL、不解释查询结果、不生成图表、不决定业务
+   指标口径。
+
+`max_rows` 策略：
+
+```text
+如果 SQL 已经有 LIMIT，执行时仍不能超过 max_rows。
+如果 SQL 没有 LIMIT，可以由执行层包装或 cursor / fetch 限制最多返回 max_rows。
+```
+
+`file.relation_normalizer`：
+
+1. 职责：把 CSV、XLS、XLSX 文件型数据源转换为统一关系表模型。
+2. 输入：`dataset_id`、`dataset_type`、`file_ref`、`sheet_names`、
+   `header_row`、`sample_rows`、`max_rows_to_inspect`。
+3. 输出：`dataset_id`、`dataset_type`、`normalized_relation_id`、
+   `relations`、`warnings`。
+4. 不负责：不生成 SQL、不执行分析查询、不解释结果、不生成图表、不修改源
+   文件、不写回 Excel、不把文件数据永久导入 MySQL、不跨 dataset 自动 join。
+
+文件型数据源归一化策略：
+
+```text
+relation_name = relation_1
+column_name = col_1
+display_name = 原始可读名
+original_name = 原始名
+```
+
+`relation.query_executor`：
+
+1. 职责：基于 `file.relation_normalizer` 生成的 `normalized_relation_id`，
+   使用 DuckDB 查询归一化后的 relation，并返回统一 QueryResult。
+2. 输入：`dataset_id`、`normalized_relation_id`、`sql`、`max_rows`、
+   `relation_names`。
+3. 输出：`normalized_relation_id`、`columns`、`rows`、`row_count`、
+   `truncated`、`execution_time_ms`。
+4. 不负责：不读取原始文件结构、不做文件归一化、不生成 SQL、不修复 SQL、
+   不解释结果、不生成图表、不修改源文件、不把文件导入 MySQL。
+
+文件型数据源查询统一使用 DuckDB 执行只读 SQL。Agent 面向统一
+RelationSchema / QueryResult，不直接感知 pandas、openpyxl 或文件格式细节。
+
+`chart.spec_builder`：
+
+1. 职责：基于 QueryResult 生成通用 chart spec。
+2. 输入：`query_result`、`chart_type`、`intent`、`field_mapping`、
+   `max_points`。
+3. 输出：`chart`、`warnings`。
+4. 不负责：不直接渲染图表、不生成 ECharts option、不生成图片、不执行查询、
+   不修改查询结果、不判断复杂业务指标口径。
+
+MVP 阶段 `chart.spec_builder` 只使用一个默认图表生成策略，不做多模型路由；
+后续可以增加 `chart_model`、`builder_version` 或专门的画图模型。首期
+`chart.spec_builder` 输出前端无关的通用 chart spec，支持 `bar`、`line`、
+`pie` 和 `table`。
 
 ### 4.5 guardrails
 
