@@ -1,4 +1,4 @@
-from agent_backend.foundation.contracts.memory import NodeCheckpointSnapshot
+from agent_backend.capabilities.agent_runtime.checkpoint.contracts import NodeCheckpointSnapshot
 
 
 def test_snapshot_contains_eight_core_groups() -> None:

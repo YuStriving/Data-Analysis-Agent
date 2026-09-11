@@ -33,6 +33,12 @@
   "user_id": "user-1",
   "session_id": "session-1",
   "dataset_ids": ["dataset-sales"],
+  "access_context": {
+    "tenant_id": "tenant-1",
+    "user_id": "user-1",
+    "allowed_dataset_ids": ["dataset-sales"],
+    "readonly": true
+  },
   "hot_context": {},
   "confirmed_facts": [],
   "conversation_summary": "",

@@ -4,6 +4,8 @@ from typing import Literal
 
 from pydantic import BaseModel, Field
 
+from agent_backend.foundation.access import AccessContext
+
 
 AnalysisTaskType = Literal[
     "trend_analysis",
@@ -22,3 +24,4 @@ class AnalysisTaskRequest(BaseModel):
     session_id: str = Field(..., description="Session identifier generated or forwarded by Java")
     question: str
     dataset_ids: list[str] = Field(default_factory=list)
+    access_context: AccessContext

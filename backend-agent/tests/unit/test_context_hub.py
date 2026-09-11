@@ -10,8 +10,18 @@ from agent_backend.capabilities.agent_runtime.context.contracts import (
     RequestContext,
     SchemaContext,
 )
-from agent_backend.foundation.contracts.memory import NodeCheckpointSnapshot
+from agent_backend.capabilities.agent_runtime.checkpoint.contracts import NodeCheckpointSnapshot
+from agent_backend.foundation.access import AccessContext
 from agent_backend.foundation.contracts.task import AnalysisTaskRequest
+
+
+def make_access_context() -> AccessContext:
+    return AccessContext(
+        tenant_id="tenant-1",
+        user_id="user-1",
+        allowed_dataset_ids=["dataset-sales"],
+        readonly=True,
+    )
 
 
 def test_build_context_uses_trend_policy() -> None:
@@ -24,12 +34,15 @@ def test_build_context_uses_trend_policy() -> None:
             session_id="session-1",
             question="Show monthly revenue trend",
             dataset_ids=["dataset-sales"],
+            access_context=make_access_context(),
         )
     )
 
     assert bundle["task_type"] == "trend_analysis"
     assert bundle["injection_strategy"] == "trend_bundle"
     assert bundle["dataset_ids"] == ["dataset-sales"]
+    assert bundle["access_context"]["allowed_dataset_ids"] == ["dataset-sales"]
+    assert bundle["access_context"]["readonly"] is True
 
 
 def test_build_context_uses_checkpoint_first_policy_for_resume() -> None:
@@ -42,6 +55,7 @@ def test_build_context_uses_checkpoint_first_policy_for_resume() -> None:
             session_id="session-1",
             question="Resume the previous task",
             dataset_ids=["dataset-sales"],
+            access_context=make_access_context(),
         ),
         snapshot=NodeCheckpointSnapshot.demo(),
     )
@@ -70,7 +84,7 @@ def test_context_builder_returns_missing_required_context() -> None:
 
     assert result.status == "missing_required_context"
     assert result.bundle is None
-    assert result.missing_sections == ["dataset", "schema"]
+    assert result.missing_sections == ["access", "dataset", "schema"]
 
 
 def test_context_builder_applies_generate_sql_v2_policy() -> None:
@@ -83,6 +97,7 @@ def test_context_builder_applies_generate_sql_v2_policy() -> None:
             session_id="session-1",
         ),
         request=RequestContext(question="Show monthly revenue trend", task_type="trend_analysis"),
+        access=make_access_context(),
         dataset=DatasetContext(
             available_dataset_ids=["dataset-sales"],
             selected_dataset_id="dataset-sales",
@@ -98,6 +113,8 @@ def test_context_builder_applies_generate_sql_v2_policy() -> None:
     assert result.bundle is not None
     assert result.bundle.identity is not None
     assert result.bundle.identity.session_id == "session-1"
+    assert result.bundle.access_context is not None
+    assert result.bundle.access_context.allowed_dataset_ids == ["dataset-sales"]
     assert result.bundle.execution_result is None
     assert result.bundle.runtime is not None
     assert result.bundle.runtime.policy_name == "generate_sql_v2"
@@ -115,6 +132,7 @@ def test_context_builder_truncates_schema_by_policy_limit() -> None:
             session_id="session-1",
         ),
         request=RequestContext(question="Show monthly revenue trend", task_type="trend_analysis"),
+        access=make_access_context(),
         dataset=DatasetContext(
             available_dataset_ids=["dataset-sales"],
             selected_dataset_id="dataset-sales",
@@ -143,6 +161,7 @@ def test_context_builder_requires_repair_context_for_repair_sql() -> None:
             session_id="session-1",
         ),
         request=RequestContext(question="Fix the SQL", task_type="unknown"),
+        access=make_access_context(),
         dataset=DatasetContext(
             available_dataset_ids=["dataset-sales"],
             selected_dataset_id="dataset-sales",
@@ -156,3 +175,33 @@ def test_context_builder_requires_repair_context_for_repair_sql() -> None:
 
     assert result.status == "missing_required_context"
     assert result.missing_sections == ["repair"]
+
+
+def test_context_builder_rejects_non_readonly_access_context() -> None:
+    source = ContextSource(
+        identity=ContextIdentity(
+            task_id="task-1",
+            trace_id="trace-1",
+            tenant_id="tenant-1",
+            user_id="user-1",
+            session_id="session-1",
+        ),
+        request=RequestContext(question="Show monthly revenue trend", task_type="trend_analysis"),
+        access=AccessContext(
+            tenant_id="tenant-1",
+            user_id="user-1",
+            allowed_dataset_ids=["dataset-sales"],
+            readonly=False,
+        ),
+        dataset=DatasetContext(
+            available_dataset_ids=["dataset-sales"],
+            selected_dataset_id="dataset-sales",
+        ),
+        schema=SchemaContext(schema_summary="orders.amount decimal"),
+    )
+    policy = resolve_context_policy("data_analysis_agent", "generate_sql")
+
+    result = ContextBuilder().build(source, policy)
+
+    assert result.status == "missing_required_context"
+    assert result.missing_sections == ["access"]

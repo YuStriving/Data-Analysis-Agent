@@ -19,8 +19,10 @@ from agent_backend.capabilities.agent_runtime.context.contracts import (
     RuntimeContext,
     SchemaContext,
 )
+from agent_backend.foundation.access import AccessContext
 
 __all__ = [
+    "AccessContext",
     "ChartContext",
     "ContextBuildResult",
     "ContextBundle",

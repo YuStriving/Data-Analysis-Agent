@@ -12,7 +12,7 @@ from agent_backend.capabilities.agent_runtime.context.contracts import (
     RuntimeContext,
     SchemaContext,
 )
-from agent_backend.foundation.contracts.memory import NodeCheckpointSnapshot
+from agent_backend.capabilities.agent_runtime.checkpoint.contracts import NodeCheckpointSnapshot
 from agent_backend.foundation.contracts.task import AnalysisTaskRequest
 
 from agent_backend.capabilities.agent_runtime.context.classifier import classify_task
@@ -88,9 +88,16 @@ class ContextBuilder:
     def _source_attr(self, section: str) -> str:
         if section == "schema":
             return "schema_context"
+        if section == "access":
+            return "access_context"
         return section
 
     def _section_is_empty(self, section: str, value: object) -> bool:
+        if section == "access":
+            return not (
+                getattr(value, "readonly", False)
+                and getattr(value, "allowed_dataset_ids", [])
+            )
         if section == "dataset":
             return not getattr(value, "selected_dataset_id", None)
         if section == "schema":
@@ -187,6 +194,7 @@ def build_context(
         user_id=request.user_id,
         session_id=snapshot.session_id if snapshot is not None else request.session_id,
         dataset_ids=list(request.dataset_ids),
+        access_context=request.access_context.model_dump(),
         hot_context={},
         confirmed_facts=[],
         conversation_summary="",

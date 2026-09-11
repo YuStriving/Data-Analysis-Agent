@@ -54,6 +54,21 @@ class MissingPromptVariablesError(PromptHubError):
         )
 
 
+class MissingPromptInputSectionsError(PromptHubError):
+    def __init__(
+        self,
+        agent_id: str,
+        node_id: str,
+        missing_sections: list[str],
+    ) -> None:
+        self.agent_id = agent_id
+        self.node_id = node_id
+        self.missing_sections = missing_sections
+        super().__init__(
+            f"Missing prompt input sections for {agent_id}.{node_id}: {missing_sections}"
+        )
+
+
 class UndeclaredPromptVariablesError(PromptHubError):
     def __init__(
         self,

@@ -7,7 +7,7 @@ public record TaskAccessContext(
         String userId,
         Set<String> roles,
         Set<String> allowedDatasets,
-        Set<String> maskedColumns
+        Set<String> maskedColumns,
+        boolean readonly
 ) {
 }
-

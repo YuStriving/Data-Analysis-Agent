@@ -38,7 +38,8 @@ public record AuthenticatedUserPrincipal(
                 userId,
                 roles,
                 intersectDatasets(requestedDatasetIds),
-                maskedColumns
+                maskedColumns,
+                true
         );
     }
 

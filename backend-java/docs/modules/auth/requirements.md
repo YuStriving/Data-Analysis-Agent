@@ -36,6 +36,7 @@
 3. `roles`
 4. `allowedDatasets`
 5. `maskedColumns`
+6. `readonly`
 
 ## 6. 边界约束
 

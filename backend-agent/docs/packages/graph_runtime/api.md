@@ -16,6 +16,14 @@ START -> load_context -> checkpoint_node -> write_answer -> END
 
 捕获当前 `AgentState` 的八个核心字段组，并生成 `snapshot_id`。
 
+主实现位于：
+
+```python
+agent_backend.capabilities.agent_runtime.checkpoint.service
+```
+
+`agent_backend.orchestration.checkpoint` 仅保留兼容导出。
+
 ### `restore_checkpoint(snapshot) -> AgentState`
 
 从 `NodeCheckpointSnapshot` 恢复 `AgentState`，保留：

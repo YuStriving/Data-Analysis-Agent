@@ -199,7 +199,8 @@ public class AuthServiceImpl implements AuthService {
                 "user-demo",
                 Set.of("ANALYST"),
                 Set.of("dataset-sales"),
-                Set.of("phone")
+                Set.of("phone"),
+                true
         );
     }
 
