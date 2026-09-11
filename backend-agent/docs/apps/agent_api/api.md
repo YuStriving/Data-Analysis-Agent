@@ -31,8 +31,15 @@
   "trace_id": "trace-demo-001",
   "tenant_id": "tenant-demo",
   "user_id": "user-demo",
+  "session_id": "session-demo-001",
   "question": "Compare monthly revenue for the last 6 months",
-  "dataset_ids": ["dataset-sales"]
+  "dataset_ids": ["dataset-sales"],
+  "access_context": {
+    "tenant_id": "tenant-demo",
+    "user_id": "user-demo",
+    "allowed_dataset_ids": ["dataset-sales"],
+    "readonly": true
+  }
 }
 ```
 

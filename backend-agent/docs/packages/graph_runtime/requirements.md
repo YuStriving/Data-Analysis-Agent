@@ -4,6 +4,10 @@
 
 `graph_runtime` 是 Agent 的执行编排核心，负责维护状态、节点顺序、节点快照、人工恢复和最终输出。
 
+节点级 checkpoint 的模型、存储协议和恢复辅助函数归属
+`agent_runtime.checkpoint` 独立模块；`orchestration` 只负责编排调用，不再从
+memory 模块获取 checkpoint 合约。
+
 ## 2. 当前能力
 
 当前 MVP graph 包含：
@@ -17,8 +21,8 @@
 ## 3. 核心职责
 
 1. 定义 `AgentState`
-2. 捕获节点级 checkpoint
-3. 从 checkpoint 恢复状态
+2. 调用 `agent_runtime.checkpoint` 捕获节点级 checkpoint
+3. 调用 `agent_runtime.checkpoint` 从 checkpoint 恢复状态
 4. 支持人工确认后恢复
 5. 在失败或中断前保留可回放状态
 

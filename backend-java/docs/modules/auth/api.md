@@ -163,7 +163,8 @@
     "userId": "1",
     "roles": ["ANALYST"],
     "allowedDatasets": ["dataset-sales"],
-    "maskedColumns": ["phone"]
+    "maskedColumns": ["phone"],
+    "readonly": true
   }
 }
 ```

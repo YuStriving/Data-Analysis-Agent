@@ -5,10 +5,13 @@ from typing import Any, Literal
 
 from pydantic import BaseModel, ConfigDict, Field
 
+from agent_backend.foundation.access import AccessContext
+
 
 ContextSectionName = Literal[
     "identity",
     "request",
+    "access",
     "dataset",
     "schema",
     "conversation",
@@ -110,6 +113,7 @@ class ContextBundle(BaseModel):
 
     identity: ContextIdentity | None = None
     request: RequestContext | None = None
+    access_context: AccessContext | None = Field(default=None, alias="access")
     dataset: DatasetContext | None = None
     schema_context: SchemaContext | None = Field(default=None, alias="schema")
     conversation: ConversationContext | None = None
@@ -126,6 +130,7 @@ class ContextSource(BaseModel):
 
     identity: ContextIdentity
     request: RequestContext
+    access_context: AccessContext | None = Field(default=None, alias="access")
     dataset: DatasetContext | None = None
     schema_context: SchemaContext | None = Field(default=None, alias="schema")
     conversation: ConversationContext | None = None
@@ -166,6 +171,7 @@ class ContextInjectionBundle(BaseModel):
     user_id: str
     session_id: str
     dataset_ids: list[str] = Field(default_factory=list)
+    access_context: dict[str, Any] = Field(default_factory=dict)
     hot_context: dict[str, str] = Field(default_factory=dict)
     confirmed_facts: list[str] = Field(default_factory=list)
     conversation_summary: str = ""

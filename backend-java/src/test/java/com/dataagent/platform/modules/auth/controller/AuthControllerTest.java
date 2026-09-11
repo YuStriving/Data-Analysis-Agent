@@ -174,7 +174,8 @@ class AuthControllerTest {
                 "user-001",
                 Set.of("ANALYST"),
                 Set.of("dataset-sales"),
-                Set.of("phone")
+                Set.of("phone"),
+                true
         );
 
         when(authService.authenticate("access-token")).thenReturn(Optional.of(principal()));
@@ -191,7 +192,8 @@ class AuthControllerTest {
                 .andExpect(status().isOk())
                 .andExpect(jsonPath("$.success").value(true))
                 .andExpect(jsonPath("$.data.userId").value("user-001"))
-                .andExpect(jsonPath("$.data.allowedDatasets[0]").value("dataset-sales"));
+                .andExpect(jsonPath("$.data.allowedDatasets[0]").value("dataset-sales"))
+                .andExpect(jsonPath("$.data.readonly").value(true));
 
         verify(securityAccessContextHolder).currentTaskAccessContext(Set.of("dataset-sales"));
     }
@@ -203,7 +205,8 @@ class AuthControllerTest {
                 "user-demo",
                 Set.of("ANALYST"),
                 Set.of("dataset-sales"),
-                Set.of("phone")
+                Set.of("phone"),
+                true
         );
 
         when(authService.contextDemo()).thenReturn(accessContext);

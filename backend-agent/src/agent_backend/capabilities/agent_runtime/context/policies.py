@@ -25,6 +25,7 @@ def resolve_context_policy(agent_name: str, node_name: str) -> ContextPolicy:
             allowed_sections=[
                 "identity",
                 "request",
+                "access",
                 "dataset",
                 "schema",
                 "conversation",
@@ -33,7 +34,7 @@ def resolve_context_policy(agent_name: str, node_name: str) -> ContextPolicy:
                 "runtime",
                 "meta",
             ],
-            required_sections=["request", "dataset", "schema"],
+            required_sections=["request", "access", "dataset", "schema"],
             max_schema_chars=4000,
             max_conversation_chars=2000,
             max_previous_turns=1,
@@ -47,6 +48,7 @@ def resolve_context_policy(agent_name: str, node_name: str) -> ContextPolicy:
             allowed_sections=[
                 "identity",
                 "request",
+                "access",
                 "dataset",
                 "schema",
                 "previous_turn",
@@ -54,7 +56,7 @@ def resolve_context_policy(agent_name: str, node_name: str) -> ContextPolicy:
                 "runtime",
                 "meta",
             ],
-            required_sections=["request", "dataset", "schema", "repair"],
+            required_sections=["request", "access", "dataset", "schema", "repair"],
             max_schema_chars=4000,
             max_repair_items=3,
             include_raw_rows=False,
