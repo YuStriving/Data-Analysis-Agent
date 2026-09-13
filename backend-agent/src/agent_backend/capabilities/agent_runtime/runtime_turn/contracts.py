@@ -7,6 +7,7 @@ from typing import Literal, Protocol
 from pydantic import BaseModel, Field
 
 from agent_backend.capabilities.agent_runtime.context.contracts import SchemaContext
+from agent_backend.foundation.llm import LlmClient as RuntimeModelClient
 
 
 RuntimeTurnStatus = Literal[
@@ -68,12 +69,6 @@ class RuntimeTurnResult(BaseModel):
 
 class RuntimeEventSink(Protocol):
     def publish(self, event: RuntimeTurnEvent) -> None: ...
-
-
-class RuntimeModelClient(Protocol):
-    model_name: str
-
-    def complete(self, prompt: str) -> str: ...
 
 
 class RuntimeSchemaProvider(Protocol):

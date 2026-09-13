@@ -1,6 +1,5 @@
 from __future__ import annotations
 
-import json
 from dataclasses import dataclass
 from datetime import datetime, timezone
 from typing import Any
@@ -13,6 +12,7 @@ from agent_backend.capabilities.agent_runtime.context.contracts import (
     RequestContext,
 )
 from agent_backend.capabilities.agent_runtime.context.policies import resolve_context_policy
+from agent_backend.capabilities.agent_runtime.execution import execute_json_llm_step
 from agent_backend.capabilities.agent_runtime.memory.contracts import (
     AnswerGeneratedPayload,
     MemoryEvent,
@@ -26,7 +26,6 @@ from agent_backend.capabilities.agent_runtime.prompt import (
     PromptBudgetGuard,
     PromptHubError,
     PromptInputAdapter,
-    render_prompt,
 )
 from agent_backend.capabilities.agent_runtime.runtime_turn.contracts import (
     RuntimeEventSink,
@@ -129,20 +128,46 @@ class RuntimeTurnRunner:
                 node_id=self.node_id,
                 bundle=context_result.bundle,
             )
-            prompt_result = render_prompt(prompt_request)
+            step_result = execute_json_llm_step(
+                prompt_request=prompt_request,
+                model_client=self.dependencies.model_client,
+                prompt_budget_guard=self.prompt_budget_guard,
+                on_prompt_rendered=lambda result, budget_status, _warnings: self._publish(
+                    request,
+                    "prompt_rendered",
+                    "Prompt rendered.",
+                    {
+                        "prompt_version": result.template_version,
+                        "rendered_prompt_hash": result.rendered_hash,
+                        "budget_status": budget_status,
+                    },
+                ),
+                on_model_call_started=lambda: self._publish(
+                    request,
+                    "model_call_started",
+                    "Calling model.",
+                ),
+                on_model_call_finished=lambda: self._publish(
+                    request,
+                    "model_call_finished",
+                    "Model call finished.",
+                ),
+            )
+            prompt_result = step_result.prompt_result
             prompt_version = prompt_result.template_version
             rendered_prompt_hash = prompt_result.rendered_hash
-            budget_result = self.prompt_budget_guard.check_rendered_prompt(
-                prompt_result.rendered_text
-            )
-            warnings.extend(budget_result.warnings)
-            if budget_result.status == "exceeded":
+            warnings.extend(step_result.warnings)
+            if step_result.status == "prompt_budget_exceeded":
                 message = "Rendered prompt exceeded budget."
                 self._publish(
                     request,
                     "context_budget_exceeded",
                     message,
-                    budget_result.model_dump(mode="json"),
+                    {
+                        "prompt_version": prompt_version,
+                        "rendered_prompt_hash": rendered_prompt_hash,
+                        "warnings": step_result.warnings,
+                    },
                 )
                 self._record_task_failed(
                     request,
@@ -163,23 +188,59 @@ class RuntimeTurnRunner:
                     warnings=warnings,
                 )
 
-            self._publish(
-                request,
-                "prompt_rendered",
-                "Prompt rendered.",
-                {
-                    "prompt_version": prompt_version,
-                    "rendered_prompt_hash": rendered_prompt_hash,
-                    "budget_status": budget_result.status,
-                },
-            )
-
-            self._publish(request, "model_call_started", "Calling model.")
-            raw_output = self.dependencies.model_client.complete(prompt_result.rendered_text)
-            self._publish(request, "model_call_finished", "Model call finished.")
-            model_output = self._parse_model_output(raw_output)
-            if model_output is None:
+            if step_result.status == "model_call_failed":
+                error = step_result.error
+                message = error.message if error is not None else "Model call failed."
+                self._record_task_failed(
+                    request,
+                    failure_stage="model_call",
+                    error_message=message,
+                    event_seq=self._event_seq + 1,
+                    memory_event_ids=memory_event_ids,
+                )
+                self._publish(
+                    request,
+                    "task_failed",
+                    message,
+                    {
+                        "error_code": error.code if error is not None else "LLM_CALL_FAILED",
+                        "retryable": error.retryable if error is not None else True,
+                    },
+                )
+                return self._result(
+                    request,
+                    status="failed",
+                    failure_code=error.code if error is not None else "LLM_CALL_FAILED",
+                    failure_message=message,
+                    memory_event_ids=memory_event_ids,
+                    prompt_version=prompt_version,
+                    rendered_prompt_hash=rendered_prompt_hash,
+                    warnings=warnings,
+                )
+            if step_result.status == "model_output_invalid" or step_result.parsed_output is None:
                 message = "Model output is not valid JSON."
+                self._publish(request, "model_output_invalid", message)
+                self._record_task_failed(
+                    request,
+                    failure_stage="parse_model_output",
+                    error_message=message,
+                    event_seq=self._event_seq + 1,
+                    memory_event_ids=memory_event_ids,
+                )
+                self._publish(request, "task_failed", message)
+                return self._result(
+                    request,
+                    status="model_output_invalid",
+                    failure_code="model_output_invalid",
+                    failure_message=message,
+                    memory_event_ids=memory_event_ids,
+                    prompt_version=prompt_version,
+                    rendered_prompt_hash=rendered_prompt_hash,
+                    warnings=warnings,
+                )
+            model_output = step_result.parsed_output
+            if model_output.get("status") not in {"ok", "clarification_required", "cannot_generate"}:
+                message = "Model output status is not supported."
                 self._publish(request, "model_output_invalid", message)
                 self._record_task_failed(
                     request,
@@ -413,17 +474,6 @@ class RuntimeTurnRunner:
         )
         self.dependencies.memory_service.record_event(event)
         memory_event_ids.append(event.event_id)
-
-    def _parse_model_output(self, raw_output: str) -> dict[str, Any] | None:
-        try:
-            parsed = json.loads(raw_output)
-        except json.JSONDecodeError:
-            return None
-        if not isinstance(parsed, dict):
-            return None
-        if parsed.get("status") not in {"ok", "clarification_required", "cannot_generate"}:
-            return None
-        return parsed
 
     def _final_answer(self, model_output: dict[str, Any]) -> str:
         status = model_output.get("status")
