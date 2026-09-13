@@ -13,6 +13,7 @@ from agent_backend.capabilities.agent_runtime.runtime_turn import (
 )
 from agent_backend.foundation.access import AccessContext
 from agent_backend.foundation.contracts.task import AnalysisTaskRequest
+from agent_backend.foundation.llm.adapters.fake import FakeLlmClient
 
 
 class FakeRedisStore:
@@ -79,16 +80,13 @@ class FakeSchemaProvider:
         )
 
 
-class FakeModelClient:
-    model_name = "fake-model"
+class FailingModelClient(FakeLlmClient):
+    def __init__(self) -> None:
+        super().__init__("")
 
-    def __init__(self, output: str) -> None:
-        self.output = output
-        self.calls: list[str] = []
-
-    def complete(self, prompt: str) -> str:
-        self.calls.append(prompt)
-        return self.output
+    def complete(self, request):
+        self.requests.append(request)
+        raise RuntimeError("model unavailable")
 
 
 def make_request(
@@ -115,14 +113,14 @@ def make_request(
 
 def make_runner(
     *,
-    model_client: FakeModelClient | None = None,
+    model_client: FakeLlmClient | None = None,
     prompt_budget_guard: PromptBudgetGuard | None = None,
     schema_provider: FakeSchemaProvider | None = None,
-) -> tuple[RuntimeTurnRunner, InMemoryRuntimeEventSink, FakeRedisStore, FakeModelClient]:
+) -> tuple[RuntimeTurnRunner, InMemoryRuntimeEventSink, FakeRedisStore, FakeLlmClient]:
     event_sink = InMemoryRuntimeEventSink()
     redis_store = FakeRedisStore()
     memory_service = MemoryService(redis_store=redis_store, mongo_store=FakeMongoStore())
-    active_model_client = model_client or FakeModelClient(
+    active_model_client = model_client or FakeLlmClient(
         json.dumps(
             {
                 "status": "cannot_generate",
@@ -169,8 +167,8 @@ def test_runtime_turn_runner_completes_generate_sql_prompt_flow() -> None:
         "memory_recorded",
         "task_completed",
     ]
-    assert len(model_client.calls) == 1
-    assert "权限约束" in model_client.calls[0]
+    assert len(model_client.requests) == 1
+    assert "权限约束" in model_client.requests[0].messages[0].content
     pending_payloads = [json.loads(raw)["payload"]["event_type"] for raw in next(iter(redis_store.pending.values()))]
     assert pending_payloads == ["question_received", "answer_generated"]
 
@@ -182,7 +180,7 @@ def test_runtime_turn_runner_stops_when_required_context_is_missing() -> None:
 
     assert result.status == "missing_required_context"
     assert result.failure_code == "missing_required_context"
-    assert len(model_client.calls) == 0
+    assert len(model_client.requests) == 0
     assert "context_missing_required" in [event.event_type for event in event_sink.events]
     pending_payloads = [json.loads(raw)["payload"]["event_type"] for raw in next(iter(redis_store.pending.values()))]
     assert pending_payloads == ["question_received", "task_failed"]
@@ -200,7 +198,7 @@ def test_runtime_turn_runner_stops_when_prompt_budget_is_exceeded() -> None:
     assert result.status == "context_budget_exceeded"
     assert result.rendered_prompt_hash is not None
     assert result.warnings == ["rendered_prompt_exceeded_budget"]
-    assert len(model_client.calls) == 0
+    assert len(model_client.requests) == 0
     assert "context_budget_exceeded" in [event.event_type for event in event_sink.events]
     pending_payloads = [json.loads(raw)["payload"]["event_type"] for raw in next(iter(redis_store.pending.values()))]
     assert pending_payloads == ["question_received", "task_failed"]
@@ -208,13 +206,31 @@ def test_runtime_turn_runner_stops_when_prompt_budget_is_exceeded() -> None:
 
 def test_runtime_turn_runner_reports_invalid_model_output() -> None:
     runner, event_sink, redis_store, model_client = make_runner(
-        model_client=FakeModelClient("not-json")
+        model_client=FakeLlmClient("not-json")
     )
 
     result = runner.run(make_request())
 
     assert result.status == "model_output_invalid"
-    assert len(model_client.calls) == 1
+    assert len(model_client.requests) == 1
     assert "model_output_invalid" in [event.event_type for event in event_sink.events]
+    pending_payloads = [json.loads(raw)["payload"]["event_type"] for raw in next(iter(redis_store.pending.values()))]
+    assert pending_payloads == ["question_received", "task_failed"]
+
+
+def test_runtime_turn_runner_records_model_events_when_model_call_fails() -> None:
+    runner, event_sink, redis_store, model_client = make_runner(
+        model_client=FailingModelClient()
+    )
+
+    result = runner.run(make_request())
+
+    assert result.status == "failed"
+    assert result.failure_code == "runtime_turn_failed"
+    assert len(model_client.requests) == 1
+    event_types = [event.event_type for event in event_sink.events]
+    assert "model_call_started" in event_types
+    assert "model_call_finished" in event_types
+    assert event_types.index("model_call_started") < event_types.index("model_call_finished")
     pending_payloads = [json.loads(raw)["payload"]["event_type"] for raw in next(iter(redis_store.pending.values()))]
     assert pending_payloads == ["question_received", "task_failed"]
