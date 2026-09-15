@@ -4,7 +4,6 @@ from typing import Literal, Protocol
 
 from pydantic import BaseModel, Field, field_validator
 
-
 LlmMessageRole = Literal["system", "user", "assistant", "tool"]
 LlmResponseFormat = Literal["text", "json_object"]
 
