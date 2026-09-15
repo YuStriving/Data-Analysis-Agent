@@ -2,26 +2,9 @@
 
 ## 1. 模块定位
 
-`foundation.llm` 是基础层的大模型调用模块。
+`foundation.llm` 是基础层的大模型调用模块，只负责稳定调用一个大模型。
 
-它和 Redis、MongoDB、MySQL、数据源 Adapter 一样，属于上层能力可以注入和替换的基础设施能力。
-
-这个模块只负责一件事：
-
-```text
-稳定调用一个大模型。
-```
-
-它不关心：
-
-```text
-1. SQL 怎么生成。
-2. Agent 节点怎么流转。
-3. Prompt 模板怎么选择。
-4. Prompt 变量怎么渲染。
-5. ContextBundle 怎么构造。
-6. data_analysis_agent 的业务输出协议是什么。
-```
+它不关心 SQL 怎么生成、Agent 节点怎么流转、Prompt 模板怎么选择、ContextBundle 怎么构造，也不关心 `data_analysis_agent` 的业务输出协议。
 
 如果某段代码需要理解 `generate_sql`、`repair_sql`、`PromptHub`、`ContextBundle`，它就不应该放在 `foundation.llm`。
 
@@ -31,66 +14,56 @@
 backend-agent/src/agent_backend/foundation/llm/
   __init__.py
   README.md
+  config.py
   contracts.py
   errors.py
+  registry.py
+  settings.py
   adapters/
     __init__.py
     fake.py
+    openai_compatible.py
+```
+
+当前已落地能力：
+
+```text
+1. 统一 LlmClient 请求、响应和错误模型。
+2. FakeLlmClient 测试适配器。
+3. LlmClientConfig / LlmRegistryConfig 配置模型。
+4. LlmClientRegistry 按 client_id 管理多个 Client。
+5. 内置 fake 和 openai-compatible provider。
+6. OpenAI-compatible Chat Completions 真实调用适配器。
+7. 基于 YAML 文件的 LLM 配置加载入口。
 ```
 
 当前还没有落地：
 
 ```text
-config.py
-registry.py
-adapters/openai_compatible.py
+1. graph/runtime 启动时自动注入 LlmClientRegistry。
+2. node 级 client_id 选择策略。
+3. 真实 API 的端到端集成验证。
 ```
 
-这三个文件属于下一阶段，用于配置化创建真实模型 Client。
-
-## 3. 当前核心接口
+## 3. 核心接口
 
 核心代码在 `contracts.py`。
 
-### 3.1 `LlmMessage`
+`LlmClient` 是基础层对外暴露的统一大模型调用接口：
 
-`LlmMessage` 表示一次大模型调用中的一条消息。
+```python
+class LlmClient(Protocol):
+    client_id: str
+    provider: str
+    model_name: str
 
-当前支持的角色：
-
-```text
-system
-user
-assistant
-tool
+    def complete(self, request: LlmCompletionRequest) -> LlmCompletionResult:
+        ...
 ```
 
-字段：
+调用方只依赖这个接口，不依赖 OpenAI、DeepSeek、Qwen、私有网关等具体 SDK 或 HTTP 细节。
 
-```text
-role:
-  消息角色。
-
-content:
-  消息正文，不能为空字符串。
-
-name:
-  可选名称，当前 MVP 暂不依赖。
-```
-
-设计决策：
-
-```text
-第一版直接使用 messages，而不是 prompt 字符串。
-```
-
-原因是大模型接口长期更适合 messages 结构。系统提示词、用户输入、上下文、历史对话、工具结果，后续都可以自然表达为不同 message。
-
-### 3.2 `LlmCompletionRequest`
-
-`LlmCompletionRequest` 表示一次大模型调用请求。
-
-字段：
+`LlmCompletionRequest` 表示一次大模型调用请求：
 
 ```text
 messages:
@@ -106,26 +79,13 @@ max_output_tokens:
   可选，传入时必须大于 0。
 
 timeout_ms:
-  可选，传入时必须大于 0。
+  可选，传入时必须大于 0。单次请求设置后会覆盖 Client 默认 timeout。
 
 metadata:
   可选，字符串字典，用于透传轻量追踪信息。
 ```
 
-注意：
-
-```text
-metadata 只放轻量标识。
-不要放完整 AgentState。
-不要放数据库连接信息。
-不要放大段业务上下文。
-```
-
-### 3.3 `LlmCompletionResult`
-
-`LlmCompletionResult` 表示一次大模型调用结果。
-
-字段：
+`LlmCompletionResult` 表示一次大模型调用结果：
 
 ```text
 content:
@@ -156,37 +116,274 @@ metadata:
   轻量结果元数据。
 ```
 
-### 3.4 `LlmUsage`
+`metadata` 只放轻量标识，不要放完整 `AgentState`、数据库连接信息或大段业务上下文。
 
-`LlmUsage` 记录 token 用量。
+## 4. 配置模型
 
-字段：
+核心代码在 `config.py`。
 
-```text
-input_tokens
-output_tokens
-total_tokens
-```
-
-如果字段有值，不能是负数。
-
-### 3.5 `LlmClient`
-
-`LlmClient` 是基础层对外暴露的统一大模型调用接口。
+`LlmClientConfig` 表示一个可被 Registry 创建的大模型 Client：
 
 ```python
-class LlmClient(Protocol):
+class LlmClientConfig(BaseModel):
     client_id: str
     provider: str
     model_name: str
-
-    def complete(self, request: LlmCompletionRequest) -> LlmCompletionResult:
-        ...
+    options: dict[str, Any] = Field(default_factory=dict)
 ```
 
-调用方只依赖这个接口，不依赖 OpenAI、Azure、本地模型等具体 SDK。
+字段语义：
 
-## 4. 当前错误模型
+```text
+client_id:
+  系统内部使用的 Client 标识，例如 sql-generator。
+
+provider:
+  Adapter 类型，例如 fake、openai-compatible。
+
+model_name:
+  供应商侧模型名，例如 deepseek-chat、gpt-4o-mini。
+
+options:
+  provider 私有配置。foundation.llm 的通用配置层不提前理解每个供应商的全部字段。
+```
+
+`LlmRegistryConfig` 表示完整 Registry 配置：
+
+```python
+class LlmRegistryConfig(BaseModel):
+    clients: list[LlmClientConfig]
+    default_client_id: str | None = None
+```
+
+`clients` 不能为空。`default_client_id` 可以为空，但调用 `get_default()` 时如果没有默认 Client，会抛 `LlmConfigError`。
+
+## 5. Client Registry
+
+核心代码在 `registry.py`。
+
+`LlmClientRegistry` 负责：
+
+```text
+1. 保存 client_id -> LlmClient。
+2. 保存 provider -> factory。
+3. 根据 LlmRegistryConfig 创建多个 Client。
+4. 按 client_id 获取 Client。
+5. 获取默认 Client。
+```
+
+典型用法：
+
+```python
+config = LlmRegistryConfig(
+    default_client_id="sql-generator",
+    clients=[
+        LlmClientConfig(
+            client_id="sql-generator",
+            provider="fake",
+            model_name="fake-sql",
+            options={"outputs": '{"sql":"select 1"}'},
+        )
+    ],
+)
+
+registry = LlmClientRegistry.from_config(config)
+client = registry.get_default()
+```
+
+内置 provider：
+
+```text
+fake
+openai-compatible
+```
+
+错误语义：
+
+```text
+provider 不支持:
+  LlmProviderUnsupportedError
+
+client_id 不存在:
+  LlmConfigError
+
+default_client_id 为空或不存在:
+  LlmConfigError
+
+重复 client_id:
+  LlmConfigError
+```
+
+`foundation.llm.registry` 只按 `client_id` 获取。不要在 foundation 层按 `sql_generation`、`repair_sql`、`node_id` 选择模型，这些属于 `agent_runtime` 或具体 Agent 的策略。
+
+## 6. Fake Client
+
+核心代码在 `adapters/fake.py`。
+
+`FakeLlmClient` 是测试和本地开发用的大模型 Client，不访问网络。
+
+支持能力：
+
+```text
+1. 返回固定字符串。
+2. 返回多次调用的输出队列。
+3. 记录每次收到的 LlmCompletionRequest。
+4. 模拟异常。
+```
+
+典型用法：
+
+```python
+client = FakeLlmClient('{"status":"ok"}')
+
+result = client.complete(
+    LlmCompletionRequest(
+        messages=[LlmMessage(role="user", content="Generate JSON.")],
+        response_format="json_object",
+    )
+)
+```
+
+测试可以通过 `client.requests` 检查上层到底传了什么 messages。
+
+## 7. OpenAI-Compatible Adapter
+
+核心代码在 `adapters/openai_compatible.py`。
+
+`OpenAICompatibleLlmClient` 是真实模型调用适配器，使用 OpenAI Python SDK 调用 Chat Completions。
+
+它负责：
+
+```text
+1. 把 LlmCompletionRequest.messages 转成 Chat Completions messages。
+2. 把 response_format=json_object 转成 {"type": "json_object"}。
+3. 透传 temperature、max_output_tokens、timeout_ms。
+4. 解析 content、usage、finish_reason、raw_response_id。
+5. 记录 latency_ms。
+6. 把 SDK 异常转换为统一 LlmClientError。
+```
+
+`provider` 固定为：
+
+```text
+openai-compatible
+```
+
+配置要求：
+
+```yaml
+client_id: sql-generator
+provider: openai-compatible
+model_name: deepseek-chat
+options:
+  base_url: https://api.deepseek.com/v1
+  api_key_env: DEEPSEEK_API_KEY
+  timeout_ms: 30000
+```
+
+安全规则：
+
+```text
+1. base_url 必填。
+2. api_key_env 必填。
+3. 禁止在 options 中配置 api_key 明文。
+4. 真实 API Key 只能从 api_key_env 指向的环境变量读取。
+```
+
+错误转换：
+
+```text
+AuthenticationError / PermissionDeniedError:
+  LlmAuthenticationError
+
+RateLimitError:
+  LlmRateLimitError
+
+APITimeoutError / TimeoutError:
+  LlmTimeoutError
+
+APIConnectionError / APIError:
+  LlmCallError
+```
+
+## 8. YAML 配置加载
+
+核心代码在 `settings.py`。
+
+当前采用：
+
+```text
+YAML 配置文件 + 环境变量保存真实 API Key
+```
+
+入口环境变量：
+
+```text
+LLM_CONFIG_PATH
+```
+
+推荐本地配置示例：
+
+```yaml
+default_client_id: sql-generator
+
+clients:
+  - client_id: sql-generator
+    provider: openai-compatible
+    model_name: deepseek-chat
+    options:
+      base_url: https://api.deepseek.com/v1
+      api_key_env: DEEPSEEK_API_KEY
+      timeout_ms: 30000
+
+  - client_id: summary
+    provider: fake
+    model_name: fake-summary
+    options:
+      outputs: summary ok
+```
+
+对外函数：
+
+```python
+load_llm_registry_config(path)
+load_llm_registry_config_from_env()
+build_llm_client_registry_from_env()
+```
+
+职责：
+
+```text
+load_llm_registry_config:
+  读取 YAML 文件，解析成 LlmRegistryConfig。
+
+load_llm_registry_config_from_env:
+  从 LLM_CONFIG_PATH 读取路径，再加载配置。
+
+build_llm_client_registry_from_env:
+  加载配置，并创建 LlmClientRegistry。
+```
+
+错误语义：
+
+```text
+LLM_CONFIG_PATH 缺失:
+  LlmConfigError
+
+配置文件不存在或不是文件:
+  LlmConfigError
+
+YAML 语法错误:
+  LlmConfigError
+
+YAML 顶层不是 mapping:
+  LlmConfigError
+
+Pydantic 配置校验失败:
+  LlmConfigError
+```
+
+## 9. 错误模型
 
 核心代码在 `errors.py`。
 
@@ -235,41 +432,7 @@ LlmCallError:
 
 上层不要直接捕获供应商 SDK 异常，真实 Adapter 应该把供应商异常转换成这里的统一错误。
 
-## 5. 当前 Fake Client
-
-核心代码在 `adapters/fake.py`。
-
-`FakeLlmClient` 是测试和本地开发用的大模型 Client。
-
-它不访问网络。
-
-支持能力：
-
-```text
-1. 返回固定字符串。
-2. 返回多次调用的输出队列。
-3. 记录每次收到的 LlmCompletionRequest。
-4. 模拟异常。
-```
-
-典型用法：
-
-```python
-client = FakeLlmClient('{"status":"ok"}')
-
-result = client.complete(
-    LlmCompletionRequest(
-        messages=[
-            LlmMessage(role="user", content="Generate JSON.")
-        ],
-        response_format="json_object",
-    )
-)
-```
-
-测试可以通过 `client.requests` 检查上层到底传了什么 messages。
-
-## 6. 和 agent_runtime 的关系
+## 10. 和 agent_runtime 的关系
 
 `foundation.llm` 只负责模型调用本身。
 
@@ -284,18 +447,7 @@ backend-agent/src/agent_backend/capabilities/agent_runtime/execution/
   llm_step.py
 ```
 
-### 6.1 `llm_request_adapter.py`
-
-`LlmRequestAdapter` 是 Agent Runtime 到 Foundation LLM 的适配层。
-
-它负责：
-
-```text
-1. 接收 PromptRenderResult。
-2. 把 rendered_text 包装成 LlmCompletionRequest。
-3. 默认要求 response_format=json_object。
-4. 把 agent_id、node_id、template_id、template_version、rendered_hash、output_contract 写入 metadata。
-```
+`LlmRequestAdapter` 负责接收 `PromptRenderResult`，把 `rendered_text` 包装成 `LlmCompletionRequest`，并把轻量追踪信息写入 metadata。
 
 当前第一版 messages 组织策略：
 
@@ -303,34 +455,9 @@ backend-agent/src/agent_backend/capabilities/agent_runtime/execution/
 把 PromptRenderResult.rendered_text 包装成一条 user message。
 ```
 
-当前这样做是为了最小改造现有 PromptHub 链路。
+后续如果要拆成 system/user/context/tool message，优先改 `LlmRequestAdapter`，不要把 messages 拼装逻辑散落到各个业务节点。
 
-后续如果要拆成：
-
-```text
-system message
-user message
-context message
-tool message
-```
-
-优先改 `LlmRequestAdapter`，不要把 messages 拼装逻辑散落到各个业务节点。
-
-### 6.2 `llm_step.py`
-
-`execute_json_llm_step()` 是一次 JSON 模型步骤的编排函数。
-
-它负责：
-
-```text
-1. 根据 PromptRenderRequest 渲染 Prompt。
-2. 使用 PromptBudgetGuard 检查渲染后文本长度。
-3. 调用 LlmRequestAdapter 构造 LlmCompletionRequest。
-4. 调用 foundation.llm.LlmClient。
-5. 读取 LlmCompletionResult.content。
-6. 解析 JSON object。
-7. 返回 JsonLlmStepResult。
-```
+`execute_json_llm_step()` 是一次 JSON 模型步骤的编排函数。它负责渲染 Prompt、检查 PromptBudget、构造 `LlmCompletionRequest`、调用 `LlmClient`、解析 JSON object，并返回 `JsonLlmStepResult`。
 
 它不负责：
 
@@ -339,68 +466,50 @@ tool message
 2. API Key 读取。
 3. SQL 结果结构校验。
 4. graph 下一节点选择。
+5. 根据 node_id 选择 client_id。
 ```
 
-当前 `JsonLlmStepResult` 包含：
+## 11. 当前调用链路
+
+当前 LLM 基础层已经支持：
 
 ```text
-status:
-  ok
-  prompt_budget_exceeded
-  model_output_invalid
-  model_call_failed
-
-prompt_result:
-  Prompt 渲染结果。
-
-warnings:
-  Prompt budget 等警告。
-
-llm_result:
-  LlmCompletionResult，可选。
-
-error:
-  LlmClientError，可选。
-
-raw_output:
-  模型原始文本内容。
-
-parsed_output:
-  JSON object 解析结果。
+YAML config
+  -> foundation.llm.settings
+  -> LlmRegistryConfig
+  -> LlmClientRegistry
+  -> LlmClient
+  -> FakeLlmClient / OpenAICompatibleLlmClient
 ```
 
-## 7. 当前调用链路
-
-当前 `runtime_turn` 代码关系是：
+当前业务运行链路仍主要依赖显式注入：
 
 ```text
-capabilities.agent_runtime.runtime_turn.RuntimeTurnRunner
-  -> capabilities.agent_runtime.execution.execute_json_llm_step
-    -> capabilities.agent_runtime.execution.LlmRequestAdapter
-      -> foundation.llm.LlmCompletionRequest
-    -> foundation.llm.LlmClient
-      -> foundation.llm.adapters.fake.FakeLlmClient
+RuntimeTurnRunner / data_analysis node
+  -> execute_json_llm_step
+  -> LlmClient.complete
 ```
 
-后续 data_analysis SQL 生成节点接入时，推荐关系是：
+下一步推荐改造为：
 
 ```text
-orchestration.data_analysis.nodes.generate_sql
-  -> capabilities.agent_runtime.execution.execute_json_llm_step
-    -> capabilities.agent_runtime.execution.LlmRequestAdapter
-      -> foundation.llm.LlmCompletionRequest
-    -> foundation.llm.LlmClient
-      -> foundation.llm.adapters.fake.FakeLlmClient
+应用启动 / graph 构建
+  -> build_llm_client_registry_from_env()
+  -> 根据默认 client_id 或 node 策略获取 LlmClient
+  -> 注入 RuntimeTurnRunner / data_analysis node
 ```
 
-当前还没有真实 OpenAI-compatible Adapter，所以生产真实调用能力仍需下一阶段实现。
+node 不应该直接依赖 `OpenAICompatibleLlmClient`，只应该依赖统一的 `LlmClient`。
 
-## 8. 当前测试覆盖
+## 12. 当前测试覆盖
 
 已覆盖的测试文件：
 
 ```text
 tests/unit/test_llm_foundation.py
+tests/unit/test_llm_registry.py
+tests/unit/test_openai_compatible_llm_adapter.py
+tests/unit/test_llm_settings.py
 tests/unit/test_llm_request_adapter.py
 tests/unit/test_data_analysis_context_nodes.py
 tests/unit/test_runtime_turn_runner.py
@@ -414,74 +523,33 @@ tests/unit/test_runtime_turn_runner.py
 3. temperature、max_output_tokens、timeout_ms 的参数校验。
 4. LlmUsage token 数不能为负。
 5. LLM 错误 code 和 retryable 语义。
-6. FakeLlmClient 固定输出。
-7. FakeLlmClient 队列输出。
-8. FakeLlmClient 异常模拟。
-9. LlmRequestAdapter 将 PromptRenderResult 转成 user message。
-10. runtime_turn 可以使用统一 LlmClient。
+6. FakeLlmClient 固定输出、队列输出、异常模拟。
+7. Registry 多 Client、默认 Client、client_id 获取。
+8. provider 不支持、默认缺失、重复 client_id 的统一错误。
+9. OpenAI-compatible 请求转换、响应解析、错误转换。
+10. 禁止配置明文 api_key。
+11. YAML 配置加载、env 路径读取和配置错误包装。
+12. LlmRequestAdapter 将 PromptRenderResult 转成 user message。
+13. runtime_turn 可以使用统一 LlmClient。
 ```
 
 验证命令：
 
 ```text
-pytest tests/unit
+python -m ruff check src/agent_backend/foundation/llm tests/unit/test_llm_settings.py tests/unit/test_openai_compatible_llm_adapter.py tests/unit/test_llm_registry.py
+python -m pytest tests/unit
 ```
 
 当前验证结果：
 
 ```text
-92 passed, 1 skipped
+All checks passed!
+124 passed, 1 skipped
 ```
 
-`ruff` 当前环境没有安装，因此本轮未执行 lint。
+## 13. 后续实现规划
 
-## 9. 后续实现规划
-
-### 9.1 下一步：配置和 Registry
-
-建议新增：
-
-```text
-config.py
-registry.py
-```
-
-目标：
-
-```text
-1. 通过配置声明多个 LLM Client。
-2. 启动时根据配置创建 Client。
-3. 上层通过 client_id 获取 Client。
-4. 支持测试 fake Client 和真实 Client 并存。
-```
-
-注意：
-
-```text
-foundation.llm.registry 只按 client_id 获取。
-不要在 foundation 层按 sql_generation、repair_sql、node_id 选择模型。
-这些属于 agent_runtime 或具体 Agent 的策略。
-```
-
-### 9.2 再下一步：OpenAI-compatible Adapter
-
-建议新增：
-
-```text
-adapters/openai_compatible.py
-```
-
-目标：
-
-```text
-1. 支持 OpenAI-compatible chat completions。
-2. 把 LlmCompletionRequest.messages 转成供应商请求。
-3. 支持 response_format=text/json_object。
-4. 记录 usage、latency_ms、finish_reason、raw_response_id。
-5. 把供应商异常转换为统一 LlmClientError。
-```
-
-### 9.3 再后续：生产 graph 注入
+### 13.1 下一步：生产 graph 注入
 
 建议改造：
 
@@ -497,10 +565,31 @@ api/kafka/worker.py
 1. 应用启动时构建 LlmClientRegistry。
 2. Agent Runtime 或 graph 根据配置选择 client_id。
 3. 把 LlmClient 注入 generate_sql。
-4. SQL 生成节点真正调用真实模型。
+4. SQL 生成节点真正调用配置指定的模型。
 ```
 
-## 10. 分层判断标准
+MVP 策略：
+
+```text
+所有 LLM node 先使用 default_client。
+node 级 client_id 策略后续再加。
+```
+
+### 13.2 再下一步：真实 API 手动集成验证
+
+建议新增手动验证脚本或文档：
+
+```text
+1. 设置 LLM_CONFIG_PATH。
+2. 设置 DEEPSEEK_API_KEY / OPENAI_API_KEY。
+3. 构建 LlmClientRegistry。
+4. 调用默认 Client。
+5. 验证返回 content、usage、finish_reason。
+```
+
+真实 API 调用不进入默认单元测试，避免依赖网络和真实密钥。
+
+## 14. 分层判断标准
 
 判断代码是否应该放在 `foundation.llm`：
 
