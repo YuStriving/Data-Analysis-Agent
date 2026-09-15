@@ -9,6 +9,7 @@ from agent_backend.foundation.llm.contracts import (
     LlmResponseFormat,
     LlmUsage,
 )
+from agent_backend.foundation.llm.config import LlmClientConfig, LlmRegistryConfig
 from agent_backend.foundation.llm.errors import (
     LlmAuthenticationError,
     LlmCallError,
@@ -18,6 +19,7 @@ from agent_backend.foundation.llm.errors import (
     LlmRateLimitError,
     LlmTimeoutError,
 )
+from agent_backend.foundation.llm.registry import LlmClientFactory, LlmClientRegistry, build_fake_llm_client
 
 __all__ = [
     "LlmAuthenticationError",
@@ -26,12 +28,17 @@ __all__ = [
     "LlmClientError",
     "LlmCompletionRequest",
     "LlmCompletionResult",
+    "LlmClientConfig",
+    "LlmClientFactory",
+    "LlmClientRegistry",
     "LlmConfigError",
     "LlmMessage",
     "LlmMessageRole",
     "LlmProviderUnsupportedError",
     "LlmRateLimitError",
+    "LlmRegistryConfig",
     "LlmResponseFormat",
     "LlmTimeoutError",
     "LlmUsage",
+    "build_fake_llm_client",
 ]
