@@ -49,6 +49,7 @@ This directory is not responsible for:
 - prompt and context design
 - MCP integration notes
 - deployment notes
+- development workflow notes such as CI verification behavior
 
 ## 6. Self-Evolution Rules
 
