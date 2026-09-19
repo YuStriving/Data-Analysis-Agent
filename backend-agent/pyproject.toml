@@ -46,3 +46,6 @@ where = ["src"]
 pythonpath = ["src"]
 testpaths = ["tests"]
 
+[tool.ruff.lint.isort]
+known-first-party = ["agent_backend"]
+

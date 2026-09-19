@@ -66,6 +66,12 @@ jobs:
 
       - name: Test
         run: mvn -B test
+        env:
+          CONFIG_STORAGE_OSS_ENDPOINT: https://oss-ci.invalid
+          CONFIG_STORAGE_OSS_BUCKET: ci-bucket
+          CONFIG_STORAGE_OSS_ACCESS_KEY_ID: ci-access-key
+          CONFIG_STORAGE_OSS_ACCESS_KEY_SECRET: ci-secret
+          CONFIG_STORAGE_OSS_PUBLIC_DOMAIN: https://oss-ci.invalid
 
   backend-agent:
     name: backend-agent
