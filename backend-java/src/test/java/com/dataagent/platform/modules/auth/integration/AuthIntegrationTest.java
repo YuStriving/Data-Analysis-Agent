@@ -9,6 +9,8 @@ import com.dataagent.platform.modules.auth.mapper.AuthLoginLogMapper;
 import com.dataagent.platform.modules.auth.mapper.AuthUserMapper;
 import com.dataagent.platform.modules.auth.repository.AuthRepository;
 import com.dataagent.platform.modules.auth.service.AuthTokenStoreService;
+import com.dataagent.platform.modules.dataset.mapper.DatasetMapper;
+import com.dataagent.platform.modules.dataset.mapper.DatasetMysqlConnMapper;
 import com.fasterxml.jackson.databind.JsonNode;
 import com.fasterxml.jackson.databind.ObjectMapper;
 import jakarta.servlet.http.Cookie;
@@ -53,6 +55,7 @@ import static org.springframework.test.web.servlet.result.MockMvcResultMatchers.
                 "spring.autoconfigure.exclude="
                         + "org.springframework.boot.autoconfigure.jdbc.DataSourceAutoConfiguration,"
                         + "org.springframework.boot.autoconfigure.jdbc.DataSourceTransactionManagerAutoConfiguration",
+                "dataset.crypto.aes-key-base64=MDEyMzQ1Njc4OWFiY2RlZjAxMjM0NTY3ODlhYmNkZWY=",
                 "auth.session.refresh-token-cookie-secure=false",
                 "auth.session.inactivity-timeout=48h"
         }
@@ -85,6 +88,12 @@ class AuthIntegrationTest {
 
     @MockBean
     private AuthLoginLogMapper authLoginLogMapper;
+
+    @MockBean
+    private DatasetMapper datasetMapper;
+
+    @MockBean
+    private DatasetMysqlConnMapper datasetMysqlConnMapper;
 
     @MockBean
     private StringRedisTemplate stringRedisTemplate;

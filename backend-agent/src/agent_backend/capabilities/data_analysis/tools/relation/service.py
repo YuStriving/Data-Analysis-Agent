@@ -94,7 +94,7 @@ class FileRelationNormalizerTool:
                 "required": ["dataset_id", "dataset_type", "normalized_relation_id", "relations", "warnings"],
             },
             allowed_agents=["data_analysis_agent"],
-            allowed_nodes=["load_schema"],
+            allowed_nodes=["load_schema", "build_context"],
             supported_dataset_types=["csv", "xls", "xlsx"],
             required_permissions=["dataset:read"],
             timeout_ms=10000,

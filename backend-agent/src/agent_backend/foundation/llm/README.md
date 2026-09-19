@@ -277,7 +277,7 @@ provider: openai-compatible
 model_name: deepseek-chat
 options:
   base_url: https://api.deepseek.com/v1
-  api_key_env: DEEPSEEK_API_KEY
+  api_key: replace-with-your-deepseek-api-key
   timeout_ms: 30000
 ```
 
@@ -285,9 +285,10 @@ options:
 
 ```text
 1. base_url 必填。
-2. api_key_env 必填。
-3. 禁止在 options 中配置 api_key 明文。
-4. 真实 API Key 只能从 api_key_env 指向的环境变量读取。
+2. api_key 或 api_key_env 至少配置一个。
+3. 本地真实 API Key 推荐写入 config/llm.local.yaml。
+4. config/llm.local.yaml 必须被 gitignore 忽略。
+5. api_key_env 仍保留，用于部署环境或密钥托管场景。
 ```
 
 错误转换：
@@ -313,10 +314,12 @@ APIConnectionError / APIError:
 当前采用：
 
 ```text
-YAML 配置文件 + 环境变量保存真实 API Key
+YAML 配置文件管理 LLM Client。
+默认读取 config/llm.local.yaml。
+LLM_CONFIG_PATH 可选，用于覆盖默认路径。
 ```
 
-入口环境变量：
+可选入口环境变量：
 
 ```text
 LLM_CONFIG_PATH
@@ -333,7 +336,7 @@ clients:
     model_name: deepseek-chat
     options:
       base_url: https://api.deepseek.com/v1
-      api_key_env: DEEPSEEK_API_KEY
+      api_key: replace-with-your-deepseek-api-key
       timeout_ms: 30000
 
   - client_id: summary
@@ -358,7 +361,8 @@ load_llm_registry_config:
   读取 YAML 文件，解析成 LlmRegistryConfig。
 
 load_llm_registry_config_from_env:
-  从 LLM_CONFIG_PATH 读取路径，再加载配置。
+  优先从 LLM_CONFIG_PATH 读取路径。
+  如果未设置，则读取 config/llm.local.yaml。
 
 build_llm_client_registry_from_env:
   加载配置，并创建 LlmClientRegistry。

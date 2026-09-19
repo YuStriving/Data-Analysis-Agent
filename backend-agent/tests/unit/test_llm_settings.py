@@ -12,8 +12,8 @@ from agent_backend.foundation.llm import (
     LlmMessage,
     build_llm_client_registry_from_env,
     load_llm_registry_config,
-    load_llm_registry_config_from_env,
 )
+from agent_backend.foundation.llm import settings as llm_settings
 
 
 def test_load_llm_registry_config_from_yaml(tmp_path: Path) -> None:
@@ -75,16 +75,29 @@ clients:
     assert registry.get_default().complete(request).content == "summary ok"
 
 
-def test_load_llm_registry_config_from_env_requires_config_path(
+def test_load_llm_registry_config_from_env_uses_default_local_path(
+    tmp_path: Path,
     monkeypatch: pytest.MonkeyPatch,
 ) -> None:
+    default_config_path = tmp_path / "llm.local.yaml"
+    default_config_path.write_text(
+        """
+default_client_id: sql-generator
+clients:
+  - client_id: sql-generator
+    provider: fake
+    model_name: fake-sql
+    options:
+      outputs: sql ok
+""",
+        encoding="utf-8",
+    )
     monkeypatch.delenv(LLM_CONFIG_PATH_ENV, raising=False)
+    monkeypatch.setattr(llm_settings, "DEFAULT_LLM_CONFIG_PATH", default_config_path)
 
-    with pytest.raises(LlmConfigError) as exc:
-        load_llm_registry_config_from_env()
+    config = llm_settings.load_llm_registry_config_from_env()
 
-    assert exc.value.code == "LLM_CONFIG_ERROR"
-    assert LLM_CONFIG_PATH_ENV in exc.value.message
+    assert config.default_client_id == "sql-generator"
 
 
 def test_load_llm_registry_config_raises_for_missing_file(tmp_path: Path) -> None:

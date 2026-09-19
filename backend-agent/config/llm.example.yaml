@@ -1,0 +1,10 @@
+default_client_id: sql-generator
+
+clients:
+  - client_id: sql-generator
+    provider: openai-compatible
+    model_name: deepseek-chat
+    options:
+      base_url: https://api.deepseek.com/v1
+      api_key: replace-with-your-deepseek-api-key
+      timeout_ms: 30000

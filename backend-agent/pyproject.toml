@@ -20,6 +20,7 @@ dependencies = [
   "duckdb>=1.1.0",
   "pandas>=2.2.0",
   "openpyxl>=3.1.0",
+  "pymysql>=1.1.1",
   "xlrd>=2.0.1",
   "sqlalchemy>=2.0.43",
   "uvicorn>=0.35.0"
@@ -44,4 +45,7 @@ where = ["src"]
 [tool.pytest.ini_options]
 pythonpath = ["src"]
 testpaths = ["tests"]
+
+[tool.ruff.lint.isort]
+known-first-party = ["agent_backend"]
 

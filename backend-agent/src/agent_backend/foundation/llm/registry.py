@@ -32,21 +32,22 @@ def build_fake_llm_client(config: LlmClientConfig) -> LlmClient:
 
 
 def build_openai_compatible_llm_client(config: LlmClientConfig) -> LlmClient:
-    if "api_key" in config.options:
-        raise LlmConfigError("api_key is not allowed in LLM client options", client_id=config.client_id)
-
     base_url = config.options.get("base_url")
     if not isinstance(base_url, str) or not base_url.strip():
         raise LlmConfigError("openai-compatible LLM client base_url is required", client_id=config.client_id)
 
     api_key_env = config.options.get("api_key_env")
-    if not isinstance(api_key_env, str) or not api_key_env.strip():
-        raise LlmConfigError("openai-compatible LLM client api_key_env is required", client_id=config.client_id)
+    api_key = config.options.get("api_key")
+    if api_key_env is not None and (not isinstance(api_key_env, str) or not api_key_env.strip()):
+        raise LlmConfigError("openai-compatible LLM client api_key_env must be non-empty", client_id=config.client_id)
+    if api_key is not None and (not isinstance(api_key, str) or not api_key.strip()):
+        raise LlmConfigError("openai-compatible LLM client api_key must be non-empty", client_id=config.client_id)
 
-    api_key = os.environ.get(api_key_env)
+    if isinstance(api_key_env, str) and api_key_env.strip():
+        api_key = os.environ.get(api_key_env)
     if api_key is None or not api_key.strip():
         raise LlmConfigError(
-            "openai-compatible LLM client api_key_env is not set",
+            "openai-compatible LLM client api_key or api_key_env is required",
             client_id=config.client_id,
         )
 

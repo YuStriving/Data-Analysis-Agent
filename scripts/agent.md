@@ -45,6 +45,8 @@ This directory is not responsible for:
 - `dev/` scripts may assume local developer context
 - `ci/` scripts must be non-interactive
 - `seed/` scripts must document what records they create
+- `ci/verify.ps1` is the local aggregate verification entrypoint
+- `ci/verify.ps1` runs frontend npm build, Java Maven tests, and Python lint/tests unless explicitly skipped
 
 ## 6. Self-Evolution Rules
 

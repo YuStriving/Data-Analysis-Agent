@@ -474,6 +474,8 @@ Commit rules:
 - prefer pull requests for non-trivial changes
 - default to draft pull requests unless the work is clearly ready
 - PR title should summarize the user-visible or architecture-visible change
+- PR titles should follow the repository Conventional Commits style
+- PR descriptions should use `.github/pull_request_template.md`
 - PR description should cover:
   - what changed
   - why it changed
