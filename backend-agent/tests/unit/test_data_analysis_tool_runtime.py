@@ -2,6 +2,7 @@ from __future__ import annotations
 
 from pathlib import Path
 
+import pytest
 from sqlalchemy import create_engine, text
 
 from agent_backend.capabilities.data_analysis.tools.runtime import (
@@ -69,6 +70,21 @@ def test_file_resolver_rejects_oss_without_local_path() -> None:
         assert "Java-issued signed URL" in str(exc)
     else:
         raise AssertionError("oss:// file_ref should require Java-issued access")
+
+
+def test_file_resolver_rejects_metadata_oss_without_local_path() -> None:
+    resolver = build_file_resolver_from_dataset_metadata(
+        {
+            "dataset-file": {
+                "dataset_id": "dataset-file",
+                "dataset_type": "csv",
+                "file_ref": "oss://bucket/sales.csv",
+            }
+        }
+    )
+
+    with pytest.raises(ValueError, match="local_path is required"):
+        resolver("oss://bucket/sales.csv")
 
 
 def test_schema_reader_runtime_reads_schema_from_metadata_engine(tmp_path: Path) -> None:

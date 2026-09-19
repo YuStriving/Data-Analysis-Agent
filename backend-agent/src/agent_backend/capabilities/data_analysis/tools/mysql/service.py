@@ -59,7 +59,7 @@ class MySQLSchemaReaderTool:
                 "required": ["dataset_id", "dataset_type", "relations"],
             },
             allowed_agents=["data_analysis_agent"],
-            allowed_nodes=["load_schema"],
+            allowed_nodes=["load_schema", "build_context"],
             supported_dataset_types=["mysql"],
             required_permissions=["dataset:read"],
             timeout_ms=10000,

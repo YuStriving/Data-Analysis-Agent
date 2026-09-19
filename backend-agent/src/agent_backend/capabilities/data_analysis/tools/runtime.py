@@ -11,6 +11,9 @@ from sqlalchemy.engine import Engine
 from agent_backend.capabilities.agent_runtime.tool_calling.runtime import (
     ToolCallingRuntime,
 )
+from agent_backend.capabilities.data_analysis.contracts import (
+    validate_dataset_metadata,
+)
 from agent_backend.capabilities.data_analysis.tools.registry import (
     EngineResolver,
     FileResolver,
@@ -77,9 +80,13 @@ def build_engine_resolver_from_dataset_metadata(
     dataset_metadata_by_id: DatasetMetadataById,
 ) -> EngineResolver:
     def _resolve(dataset_id: str) -> Engine:
-        metadata = dataset_metadata_by_id.get(dataset_id)
-        if metadata is None:
+        raw_metadata = dataset_metadata_by_id.get(dataset_id)
+        if raw_metadata is None:
             raise ValueError(f"Dataset metadata was not found: {dataset_id}")
+        metadata = validate_dataset_metadata(
+            dict(raw_metadata),
+            expected_dataset_id=dataset_id,
+        ).to_runtime_metadata()
         if metadata.get("dataset_type") != "mysql":
             raise ValueError(f"Dataset is not a MySQL dataset: {dataset_id}")
 
@@ -95,7 +102,8 @@ def build_engine_resolver_from_dataset_metadata(
 
 def _file_ref_path_map(dataset_metadata_by_id: DatasetMetadataById) -> dict[str, str | Path]:
     mapping: dict[str, str | Path] = {}
-    for metadata in dataset_metadata_by_id.values():
+    for raw_metadata in dataset_metadata_by_id.values():
+        metadata = validate_dataset_metadata(dict(raw_metadata)).to_runtime_metadata()
         dataset_type = metadata.get("dataset_type")
         if dataset_type not in {"csv", "xls", "xlsx"}:
             continue

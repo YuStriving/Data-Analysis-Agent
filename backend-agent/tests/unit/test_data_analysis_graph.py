@@ -149,6 +149,7 @@ def test_data_analysis_graph_injects_llm_client_into_generate_sql() -> None:
         "dataset_id": "dataset-sales",
         "dataset_type": "mysql",
         "display_name": "Sales",
+        "mysql": {"sqlalchemy_url": "sqlite:///:memory:"},
     }
 
     result = graph.invoke(state)

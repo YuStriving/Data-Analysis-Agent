@@ -9,6 +9,8 @@ import com.dataagent.platform.modules.auth.mapper.AuthLoginLogMapper;
 import com.dataagent.platform.modules.auth.mapper.AuthUserMapper;
 import com.dataagent.platform.modules.auth.repository.AuthRepository;
 import com.dataagent.platform.modules.auth.service.AuthTokenStoreService;
+import com.dataagent.platform.modules.dataset.mapper.DatasetMapper;
+import com.dataagent.platform.modules.dataset.mapper.DatasetMysqlConnMapper;
 import com.fasterxml.jackson.databind.JsonNode;
 import com.fasterxml.jackson.databind.ObjectMapper;
 import jakarta.servlet.http.Cookie;
@@ -85,6 +87,12 @@ class AuthIntegrationTest {
 
     @MockBean
     private AuthLoginLogMapper authLoginLogMapper;
+
+    @MockBean
+    private DatasetMapper datasetMapper;
+
+    @MockBean
+    private DatasetMysqlConnMapper datasetMysqlConnMapper;
 
     @MockBean
     private StringRedisTemplate stringRedisTemplate;
