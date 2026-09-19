@@ -5,7 +5,7 @@ from typing import Any
 
 from pydantic import ValidationError
 
-from agent_backend.capabilities.agent_runtime.memory.contracts import (
+from agent_backend.foundation.contracts.memory import (
     AnswerGeneratedPayload,
     ChartBuiltPayload,
     FlushResult,

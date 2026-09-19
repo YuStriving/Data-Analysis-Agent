@@ -27,14 +27,3 @@ MVP_DAG_EDGES: tuple[DagEdge, ...] = (
     ("build_chart", "persist_result"),
 )
 
-RESERVED_DAG_EDGES: tuple[DagEdge, ...] = (
-    ("validate_sql", "repair_sql"),
-    ("repair_sql", "validate_sql"),
-    ("validate_sql", "human_review_interrupt"),
-    ("human_review_interrupt", "run_query"),
-    ("run_query", "repair_sql"),
-    ("run_query", "python_analysis"),
-    ("python_analysis", "interpret_result"),
-    ("persist_result", "memory_update"),
-    ("persist_result", "eval_record"),
-)

@@ -2,9 +2,9 @@ from __future__ import annotations
 
 import json
 
-from agent_backend.capabilities.agent_runtime.context.contracts import SchemaContext
+from agent_backend.foundation.contracts.context import SchemaContext
 from agent_backend.capabilities.agent_runtime.memory.service import MemoryService
-from agent_backend.capabilities.agent_runtime.memory.contracts import PendingMemoryItem
+from agent_backend.foundation.contracts.memory import PendingMemoryItem
 from agent_backend.capabilities.agent_runtime.prompt import PromptBudgetGuard, PromptBudgetPolicy
 from agent_backend.capabilities.agent_runtime.runtime_turn import (
     InMemoryRuntimeEventSink,

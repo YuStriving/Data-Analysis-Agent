@@ -40,6 +40,6 @@ def test_restore_checkpoint_keeps_last_stable_node() -> None:
     snapshot = capture_checkpoint(state, node_id="generate_sql")
     restored = restore_checkpoint(snapshot)
 
-    assert snapshot.core.graph_state.node_name == "generate_sql"
+    assert snapshot.node_name == "generate_sql"
     assert restored["node_id"] == "generate_sql"
     assert restored["resume_cursor"] == "cursor-1"

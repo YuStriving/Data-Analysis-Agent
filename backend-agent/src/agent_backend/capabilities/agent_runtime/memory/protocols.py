@@ -3,7 +3,7 @@ from __future__ import annotations
 from collections.abc import Sequence
 from typing import Any, Protocol, runtime_checkable
 
-from agent_backend.capabilities.agent_runtime.memory.contracts import (
+from agent_backend.foundation.contracts.memory import (
     MemoryEvent,
     MemoryTurn,
     PendingMemoryItem,

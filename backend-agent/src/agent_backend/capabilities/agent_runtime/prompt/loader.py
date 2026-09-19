@@ -3,6 +3,8 @@ from __future__ import annotations
 from pathlib import Path
 from typing import Any
 
+import yaml
+
 from agent_backend.capabilities.agent_runtime.prompt.contracts import PromptTemplate
 from agent_backend.capabilities.agent_runtime.prompt.exceptions import PromptTemplateFormatError
 
@@ -67,42 +69,22 @@ def _split_front_matter(text: str, path: Path) -> tuple[str, str]:
 
 
 def _parse_front_matter(metadata: str, path: Path) -> dict[str, Any]:
-    parsed: dict[str, Any] = {}
-    current_key: str | None = None
-
-    for raw_line in metadata.splitlines():
-        line = raw_line.rstrip()
-        if not line.strip() or line.lstrip().startswith("#"):
-            continue
-
-        stripped = line.strip()
-        if stripped.startswith("- "):
-            if current_key is None:
-                raise PromptTemplateFormatError(
-                    "Front matter list item has no parent key",
-                    str(path),
-                )
-            parsed.setdefault(current_key, []).append(_strip_quotes(stripped[2:].strip()))
-            continue
-
-        if ":" not in line:
-            raise PromptTemplateFormatError(
-                f"Invalid front matter line: {line}",
-                str(path),
-            )
-
-        key, value = line.split(":", 1)
-        current_key = key.strip()
-        value = value.strip()
-        parsed[current_key] = [] if value == "" else _strip_quotes(value)
-
+    try:
+        parsed = yaml.safe_load(metadata) or {}
+    except yaml.YAMLError as exc:
+        raise PromptTemplateFormatError(
+            f"Invalid prompt template front matter: {exc}",
+            str(path),
+        ) from exc
+    if not isinstance(parsed, dict):
+        raise PromptTemplateFormatError(
+            "Prompt template front matter must be a mapping",
+            str(path),
+        )
+    for key in ("required_variables", "optional_variables"):
+        if parsed.get(key) is None:
+            parsed[key] = []
     return parsed
-
-
-def _strip_quotes(value: str) -> str:
-    if len(value) >= 2 and value[0] == value[-1] and value[0] in {"'", '"'}:
-        return value[1:-1]
-    return value
 
 
 def _validate_metadata(metadata: dict[str, Any], path: Path) -> None:

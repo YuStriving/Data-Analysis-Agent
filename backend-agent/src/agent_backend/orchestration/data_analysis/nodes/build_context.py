@@ -8,7 +8,7 @@ from uuid import uuid4
 from pydantic import ValidationError
 
 from agent_backend.capabilities.agent_runtime.context.builder import ContextBuilder
-from agent_backend.capabilities.agent_runtime.context.contracts import (
+from agent_backend.foundation.contracts.context import (
     ContextIdentity,
     ContextSource,
     DatasetContext,

@@ -2,7 +2,7 @@ from __future__ import annotations
 
 from typing import Any
 
-from agent_backend.capabilities.agent_runtime.context.contracts import (
+from agent_backend.foundation.contracts.context import (
     ContextBundle,
     ConversationContext,
     PreviousTurnContext,

@@ -6,7 +6,7 @@ from typing import Literal, Protocol
 
 from pydantic import BaseModel, Field
 
-from agent_backend.capabilities.agent_runtime.context.contracts import SchemaContext
+from agent_backend.foundation.contracts.context import SchemaContext
 from agent_backend.foundation.llm import LlmClient as RuntimeModelClient
 
 

@@ -2,7 +2,7 @@ from __future__ import annotations
 
 from copy import deepcopy
 
-from agent_backend.capabilities.agent_runtime.context.contracts import (
+from agent_backend.foundation.contracts.context import (
     ContextBuildResult,
     ContextBundle,
     ContextInjectionBundle,
@@ -201,8 +201,8 @@ def build_context(
         injected_context_version="v1",
     )
     if snapshot is not None:
-        bundle.hot_context = dict(snapshot.core.context_state.hot_context)
-        bundle.confirmed_facts = list(snapshot.core.context_state.confirmed_facts)
-        bundle.conversation_summary = snapshot.core.context_state.conversation_summary
-        bundle.injected_context_version = snapshot.core.context_state.injected_context_version
+        bundle.hot_context = dict(snapshot.hot_context)
+        bundle.confirmed_facts = list(snapshot.confirmed_facts)
+        bundle.conversation_summary = snapshot.conversation_summary
+        bundle.injected_context_version = snapshot.injected_context_version
     return bundle.model_dump()

@@ -5,7 +5,7 @@ from datetime import datetime, timezone
 from typing import Any
 
 from agent_backend.capabilities.agent_runtime.context.builder import ContextBuilder
-from agent_backend.capabilities.agent_runtime.context.contracts import (
+from agent_backend.foundation.contracts.context import (
     ContextIdentity,
     ContextSource,
     DatasetContext,
@@ -13,7 +13,7 @@ from agent_backend.capabilities.agent_runtime.context.contracts import (
 )
 from agent_backend.capabilities.agent_runtime.context.policies import resolve_context_policy
 from agent_backend.capabilities.agent_runtime.execution import execute_json_llm_step
-from agent_backend.capabilities.agent_runtime.memory.contracts import (
+from agent_backend.foundation.contracts.memory import (
     AnswerGeneratedPayload,
     MemoryEvent,
     QuestionReceivedPayload,

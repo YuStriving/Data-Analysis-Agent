@@ -1,6 +1,6 @@
 """Short-term and long-term memory package."""
 
-from agent_backend.capabilities.agent_runtime.memory.contracts import (
+from agent_backend.foundation.contracts.memory import (
     FlushResult,
     MemoryEvent,
     MemoryScope,

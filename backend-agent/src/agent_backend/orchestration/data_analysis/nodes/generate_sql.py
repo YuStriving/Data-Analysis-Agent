@@ -3,7 +3,7 @@ from __future__ import annotations
 from pydantic import ValidationError
 
 from agent_backend.capabilities.data_analysis.contracts import GenerateSqlResult
-from agent_backend.capabilities.agent_runtime.context.contracts import ContextBundle
+from agent_backend.foundation.contracts.context import ContextBundle
 from agent_backend.capabilities.agent_runtime.execution import LlmClient, execute_json_llm_step
 from agent_backend.capabilities.agent_runtime.prompt import (
     MissingPromptInputSectionsError,

@@ -4,7 +4,7 @@ import json
 from typing import Any
 from uuid import uuid4
 
-from agent_backend.capabilities.agent_runtime.memory.contracts import PendingMemoryItem
+from agent_backend.foundation.contracts.memory import PendingMemoryItem
 
 
 class RedisMemoryStore:

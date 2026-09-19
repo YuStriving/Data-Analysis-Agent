@@ -1,6 +1,6 @@
 import pytest
 
-from agent_backend.capabilities.agent_runtime.context.contracts import (
+from agent_backend.foundation.contracts.context import (
     ContextBundle,
     ConversationContext,
     DatasetContext,

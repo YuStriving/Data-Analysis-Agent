@@ -109,6 +109,32 @@ def test_load_prompt_template_rejects_missing_front_matter(tmp_path: Path) -> No
         load_prompt_template(path)
 
 
+def test_load_prompt_template_accepts_yaml_inline_lists(tmp_path: Path) -> None:
+    path = tmp_path / "inline-list.v1.md"
+    path.write_text(
+        """---
+template_id: data_analysis.generate_sql.inline
+agent_id: data_analysis_agent
+node_id: generate_sql
+version: v1
+status: active
+description: Test inline YAML list.
+required_variables: [user_question, dataset_context]
+optional_variables: []
+output_contract: generate_sql_result_v1
+---
+
+测试模板。
+""",
+        encoding="utf-8",
+    )
+
+    template = load_prompt_template(path)
+
+    assert template.required_variables == ["user_question", "dataset_context"]
+    assert template.optional_variables == []
+
+
 def _write_template(path: Path, template_id_suffix: str) -> None:
     path.parent.mkdir(parents=True, exist_ok=True)
     path.write_text(
