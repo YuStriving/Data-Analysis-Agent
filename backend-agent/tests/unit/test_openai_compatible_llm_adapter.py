@@ -173,21 +173,23 @@ def test_openai_compatible_client_maps_sdk_errors(
     assert exc.value.client_id == "main"
 
 
-def test_openai_compatible_factory_rejects_inline_api_key() -> None:
+def test_openai_compatible_factory_accepts_inline_api_key() -> None:
     config = _client_config(options={"base_url": "https://llm.example/v1", "api_key": "secret"})
 
-    with pytest.raises(LlmConfigError) as exc:
-        build_openai_compatible_llm_client(config)
+    client = build_openai_compatible_llm_client(config)
 
-    assert exc.value.client_id == "main"
+    assert client.provider == "openai-compatible"
+    assert client.model_name == "model"
 
 
 @pytest.mark.parametrize(
     "options",
     [
         {},
-        {"api_key_env": "TEST_LLM_API_KEY"},
         {"base_url": "https://llm.example/v1"},
+        {"base_url": "https://llm.example/v1", "api_key": ""},
+        {"base_url": "https://llm.example/v1", "api_key_env": ""},
+        {"base_url": "https://llm.example/v1", "api_key_env": "TEST_LLM_API_KEY"},
         {"base_url": "https://llm.example/v1", "api_key_env": "TEST_LLM_API_KEY", "timeout_ms": 0},
     ],
 )

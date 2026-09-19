@@ -26,6 +26,7 @@ from agent_backend.foundation.llm.registry import (
     build_openai_compatible_llm_client,
 )
 from agent_backend.foundation.llm.settings import (
+    DEFAULT_LLM_CONFIG_PATH,
     LLM_CONFIG_PATH_ENV,
     build_llm_client_registry_from_env,
     load_llm_registry_config,
@@ -33,6 +34,7 @@ from agent_backend.foundation.llm.settings import (
 )
 
 __all__ = [
+    "DEFAULT_LLM_CONFIG_PATH",
     "LLM_CONFIG_PATH_ENV",
     "LlmAuthenticationError",
     "LlmCallError",

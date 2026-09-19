@@ -58,14 +58,12 @@ from agent_backend.capabilities.agent_runtime.tool_calling import (
     ToolCallRequest,
     ToolCallingRuntime,
 )
-from agent_backend.capabilities.data_analysis.tools import build_data_analysis_tool_registry
+from agent_backend.capabilities.data_analysis.tools import build_data_analysis_tool_runtime
 
 
-runtime = ToolCallingRuntime(
-    build_data_analysis_tool_registry(
-        engine_resolver=lambda dataset_id: engine,
-        file_resolver=lambda file_ref: file_ref,
-    )
+runtime = build_data_analysis_tool_runtime(
+    engine_resolver=lambda dataset_id: engine,
+    file_resolver=lambda file_ref: file_ref,
 )
 
 result = await runtime.call(
@@ -114,6 +112,59 @@ result.status = validation_failed / permission_denied / guardrail_rejected / tim
 result.data = null
 result.error = 结构化错误
 ```
+
+数据分析 Agent 也提供从 Java 下发的 dataset metadata 构造工具 runtime 的
+MVP 装配入口：
+
+```python
+from agent_backend.capabilities.data_analysis.tools import (
+    build_data_analysis_tool_runtime,
+    build_engine_resolver_from_dataset_metadata,
+    build_file_resolver_from_dataset_metadata,
+)
+
+
+dataset_metadata_by_id = {
+    "dataset-sales": {
+        "dataset_id": "dataset-sales",
+        "dataset_type": "mysql",
+        "display_name": "Sales",
+        "mysql": {
+            "host": "127.0.0.1",
+            "port": 3306,
+            "database": "sales",
+            "username": "readonly_user",
+            "password": "readonly_password",
+            "driver": "mysql+pymysql",
+        },
+    },
+    "dataset-upload-1": {
+        "dataset_id": "dataset-upload-1",
+        "dataset_type": "xlsx",
+        "display_name": "sales.xlsx",
+        "file_ref": "oss://bucket/path/sales.xlsx",
+        "local_path": "runtime/files/sales.xlsx",
+        "sheet_names": ["Sheet1"],
+        "header_row": 1,
+    }
+}
+
+tool_runtime = build_data_analysis_tool_runtime(
+    engine_resolver=build_engine_resolver_from_dataset_metadata(dataset_metadata_by_id),
+    file_resolver=build_file_resolver_from_dataset_metadata(dataset_metadata_by_id),
+)
+```
+
+当前 MVP 每次 `engine_resolver(dataset_id)` 被调用时都会创建新的
+SQLAlchemy `Engine`。后续需要按 dataset/连接指纹增加 Engine 缓存，并在连接
+轮换或 worker 关闭时释放。当前简单方案允许 Java 把只读连接信息下发给
+Python；生产化前需要替换成 Java 下发的 secret ref 或短 TTL 只读连接凭证。
+
+文件型数据集通过 `file_resolver(file_ref) -> local_path` 进入
+`file.relation_normalizer`。MVP resolver 支持本地路径和 `file://` URI，也支持
+Java 在 dataset metadata 里把 `file_ref` 映射到本地暂存路径 `local_path`。
+裸 `oss://` 当前会被拒绝。生产化前应由 Java 校验文件权限，并下发 signed URL、
+短 TTL 文件 token 或 Java 暂存后的本地路径；Python 不应持有长期 OSS 凭证。
 
 ## 4. 当前工具清单
 
@@ -232,6 +283,7 @@ src/agent_backend/capabilities/agent_runtime/tool_calling/registry.py
 src/agent_backend/capabilities/agent_runtime/tool_calling/runtime.py
 src/agent_backend/capabilities/agent_runtime/tool_calling/logging.py
 src/agent_backend/capabilities/data_analysis/tools/registry.py
+src/agent_backend/capabilities/data_analysis/tools/runtime.py
 src/agent_backend/capabilities/data_analysis/tools/mysql/service.py
 src/agent_backend/capabilities/data_analysis/tools/relation/service.py
 src/agent_backend/capabilities/data_analysis/tools/chart/service.py
@@ -242,4 +294,5 @@ src/agent_backend/capabilities/data_analysis/tools/chart/service.py
 ```text
 tests/unit/test_tool_calling_runtime.py
 tests/unit/test_data_analysis_tools.py
+tests/unit/test_data_analysis_tool_runtime.py
 ```

@@ -12,6 +12,7 @@ from agent_backend.foundation.llm.errors import LlmConfigError
 from agent_backend.foundation.llm.registry import LlmClientRegistry
 
 LLM_CONFIG_PATH_ENV = "LLM_CONFIG_PATH"
+DEFAULT_LLM_CONFIG_PATH = Path(__file__).resolve().parents[4] / "config" / "llm.local.yaml"
 
 
 def load_llm_registry_config(path: str | Path) -> LlmRegistryConfig:
@@ -40,7 +41,7 @@ def load_llm_registry_config(path: str | Path) -> LlmRegistryConfig:
 def load_llm_registry_config_from_env() -> LlmRegistryConfig:
     config_path = os.environ.get(LLM_CONFIG_PATH_ENV)
     if config_path is None or not config_path.strip():
-        raise LlmConfigError(f"{LLM_CONFIG_PATH_ENV} is required")
+        config_path = str(DEFAULT_LLM_CONFIG_PATH)
     return load_llm_registry_config(config_path)
 
 
