@@ -156,6 +156,9 @@ def test_data_analysis_graph_injects_llm_client_into_generate_sql() -> None:
 
     assert result["error"]["has_error"] is False
     assert result["analysis"]["candidate_sql"].startswith("SELECT order_month")
+    assert result["analysis"]["validated_sql"].startswith("SELECT order_month")
+    assert result["analysis"]["sql_validation"]["passed"] is True
+    assert result["analysis"]["sql_validation"]["referenced_relations"] == ["sales"]
     assert result["analysis"]["model"] == "fake-model"
     assert len(model_client.requests) == 1
     assert "Show monthly revenue trend" in model_client.requests[0].messages[0].content
@@ -196,6 +199,8 @@ def test_data_analysis_graph_reads_schema_then_generates_sql(tmp_path: Path) -> 
     assert result["error"]["has_error"] is False
     assert "sales(order_month TEXT, revenue INTEGER)" in result["context"]["schema_context"]["schema_summary"]
     assert result["analysis"]["candidate_sql"].startswith("SELECT order_month")
+    assert result["analysis"]["validated_sql"].startswith("SELECT order_month")
+    assert result["analysis"]["sql_validation"]["passed"] is True
     assert len(model_client.requests) == 1
 
 
@@ -270,7 +275,46 @@ def test_data_analysis_graph_normalizes_file_schema_then_generates_sql(tmp_path:
     assert "col_2 int64" in schema_summary
     assert result["context"]["normalized_relation_id"].startswith("nr_")
     assert result["analysis"]["candidate_sql"].startswith("SELECT col_1")
+    assert result["analysis"]["validated_sql"].startswith("SELECT col_1")
+    assert result["analysis"]["sql_validation"]["passed"] is True
+    assert result["analysis"]["sql_validation"]["referenced_relations"] == ["relation_1"]
     assert len(model_client.requests) == 1
+
+
+def test_data_analysis_graph_rejects_unsafe_sql_before_execution() -> None:
+    model_client = FakeLlmClient(
+        """
+        {
+          "status": "ok",
+          "sql": "DELETE FROM sales",
+          "reason": "Unsafe mutation.",
+          "used_tables": ["sales"],
+          "used_fields": ["order_month"],
+          "assumptions": [],
+          "warnings": [],
+          "clarification_questions": []
+        }
+        """
+    )
+    graph = build_data_analysis_graph(
+        model_client=model_client,
+        tool_runtime=ToolCallingRuntime(ToolRegistry([FakeSchemaTool(), FakeFileRelationNormalizerTool()])),
+    )
+    state = request_to_initial_state(_request())
+    state["context"]["dataset_metadata"] = {
+        "dataset_id": "dataset-sales",
+        "dataset_type": "mysql",
+        "display_name": "Sales",
+        "mysql": {"sqlalchemy_url": "sqlite:///:memory:"},
+    }
+
+    result = graph.invoke(state)
+
+    assert result["error"]["has_error"] is True
+    assert result["error"]["error_code"] == "SQL_FORBIDDEN_TOKEN"
+    assert result["error"]["failure_stage"] == "validate_sql"
+    assert result["analysis"]["sql_validation"]["passed"] is False
+    assert result["graph"]["node_id"] == "fail_task"
 
 
 def _request() -> AnalysisTaskRequest:

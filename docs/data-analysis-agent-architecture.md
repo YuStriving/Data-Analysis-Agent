@@ -284,7 +284,7 @@ flowchart TD
     C --> D["plan_analysis"]
     D --> E["generate_sql"]
     E --> F["sql_guard"]
-    F -->|pass| G["run_query"]
+    F -->|pass| G["execute_sql"]
     F -->|reject| H["repair_sql"]
     H --> E
     G --> I["python_analysis"]

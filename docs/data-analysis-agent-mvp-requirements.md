@@ -190,7 +190,7 @@ MVP 只要求实现最小闭环分析图，不要求一步到位实现全部增�
 4. `plan_analysis`
 5. `generate_sql`
 6. `sql_guard`
-7. `run_query`
+7. `execute_sql`
 8. `python_analysis`
 9. `build_chart`
 10. `write_answer`

@@ -16,11 +16,11 @@ from agent_backend.capabilities.data_analysis.tools import (
 from agent_backend.foundation.llm import LlmClient
 from agent_backend.orchestration.data_analysis.nodes import (
     build_chart,
+    execute_sql,
     fail_task,
     interpret_result,
     load_task_context,
     persist_result,
-    run_query,
     validate_sql,
 )
 from agent_backend.orchestration.data_analysis.nodes.build_context import (
@@ -64,7 +64,7 @@ def build_data_analysis_graph(
         ),
     )
     workflow.add_node("validate_sql", validate_sql)
-    workflow.add_node("run_query", run_query)
+    workflow.add_node("execute_sql", execute_sql)
     workflow.add_node("interpret_result", interpret_result)
     workflow.add_node("build_chart", build_chart)
     workflow.add_node("persist_result", persist_result)
@@ -95,8 +95,15 @@ def build_data_analysis_graph(
             "fail_task": "fail_task",
         },
     )
-    workflow.add_edge("validate_sql", "run_query")
-    workflow.add_edge("run_query", "interpret_result")
+    workflow.add_conditional_edges(
+        "validate_sql",
+        _next_or_default("execute_sql"),
+        {
+            "execute_sql": "execute_sql",
+            "fail_task": "fail_task",
+        },
+    )
+    workflow.add_edge("execute_sql", "interpret_result")
     workflow.add_edge("interpret_result", "build_chart")
     workflow.add_edge("build_chart", "persist_result")
     workflow.add_edge("persist_result", END)

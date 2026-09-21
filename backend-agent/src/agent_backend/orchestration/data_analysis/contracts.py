@@ -8,7 +8,7 @@ DataAnalysisNodeId = Literal[
     "build_context",
     "generate_sql",
     "validate_sql",
-    "run_query",
+    "execute_sql",
     "interpret_result",
     "build_chart",
     "persist_result",
