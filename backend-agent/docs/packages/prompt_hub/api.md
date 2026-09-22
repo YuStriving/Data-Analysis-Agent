@@ -1,36 +1,34 @@
 # Python Prompt Hub 接口文档
 
-## 1. 当前公开内容
+## 1. 公开入口
 
-### `SYSTEM_PROMPT`
+### `render_system_prompt(agent_id: str, variables: dict | None = None) -> PromptRenderResult`
 
-当前值：
+加载并渲染指定 Agent 的 active system prompt。
+
+返回字段：
 
 ```text
-You are a read-only enterprise data analysis agent.
-Follow tool constraints, preserve traceability, and do not fabricate metrics.
+agent_id
+node_id = system
+template_id
+template_version
+output_contract
+rendered_text
+rendered_hash
+variables_snapshot
 ```
 
-## 2. 建议公开函数
+## 2. 兼容入口
 
-### `get_system_prompt() -> str`
+### `render_prompt(request: PromptRenderRequest) -> PromptRenderResult`
 
-### `get_prompt_bundle(task_type: str, context: dict) -> dict`
+保留为底层渲染入口，但当前只支持 `node_id="system"` 的 system prompt。
 
-返回示例：
-
-```json
-{
-  "system": "You are a read-only enterprise data analysis agent.",
-  "planner": "Break the question into analysis steps.",
-  "analyst": "Generate read-only SQL only.",
-  "reviewer": "Escalate when risk is high."
-}
-```
+节点级 LLM 内容应使用 Node Skill 相关接口。
 
 ## 3. Prompt 来源
 
-1. `src/agent_backend/capabilities/data_analysis/prompts/system/base.md`
-2. `src/agent_backend/capabilities/data_analysis/prompts/planner/analysis-planner.md`
-3. `src/agent_backend/capabilities/data_analysis/prompts/analyst/sql-analyst.md`
-4. `src/agent_backend/capabilities/data_analysis/prompts/reviewer/human-review.md`
+```text
+src/agent_backend/capabilities/data_analysis/prompts/system/base.v1.md
+```

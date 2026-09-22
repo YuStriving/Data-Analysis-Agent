@@ -7,53 +7,37 @@ from agent_backend.capabilities.agent_runtime.prompt import (
     PromptRenderRequest,
     map_prompt_error_to_user_failure,
     render_prompt,
+    render_system_prompt,
 )
 from agent_backend.capabilities.agent_runtime.prompt.exceptions import (
     DuplicateActivePromptTemplateError,
+    PromptTemplateNotFoundError,
     PromptTemplateFormatError,
 )
 from agent_backend.capabilities.agent_runtime.prompt.loader import load_prompt_template
 from agent_backend.capabilities.agent_runtime.prompt.registry import PromptRegistry
 
 
-def test_render_prompt_loads_active_generate_sql_template() -> None:
-    result = render_prompt(
-        PromptRenderRequest(
-            agent_id="data_analysis_agent",
-            node_id="generate_sql",
-            variables={
-                "user_question": "统计每月销售额",
-                "dataset_context": {"selected_dataset_id": "dataset-sales"},
-                "schema_context": {"orders": ["order_date", "amount"]},
-                "access_context": {"allowed_tables": ["orders"]},
-            },
-        )
-    )
+def test_render_system_prompt_loads_active_system_template() -> None:
+    result = render_system_prompt("data_analysis_agent")
 
-    assert result.template_id == "data_analysis.generate_sql.base"
+    assert result.template_id == "data_analysis.system.base"
     assert result.template_version == "v1"
-    assert result.output_contract == "generate_sql_result_v1"
+    assert result.output_contract == "system_prompt_v1"
     assert len(result.rendered_hash) == 64
     assert "{{" not in result.rendered_text
-    assert "metric_context" in result.variables_snapshot
-    assert "可用指标定义（可选）：无" in result.rendered_text
+    assert "全局规则" in result.rendered_text
 
 
-def test_render_prompt_raises_for_missing_required_variables() -> None:
-    with pytest.raises(MissingPromptVariablesError) as exc_info:
+def test_prompt_hub_no_longer_loads_node_prompts() -> None:
+    with pytest.raises(PromptTemplateNotFoundError):
         render_prompt(
             PromptRenderRequest(
                 agent_id="data_analysis_agent",
                 node_id="generate_sql",
-                variables={
-                    "user_question": "统计每月销售额",
-                    "dataset_context": {"selected_dataset_id": "dataset-sales"},
-                    "access_context": {"allowed_tables": ["orders"]},
-                },
+                variables={},
             )
         )
-
-    assert exc_info.value.missing_variables == ["schema_context"]
 
 
 def test_prompt_error_maps_to_user_facing_failure() -> None:
@@ -73,24 +57,12 @@ def test_prompt_error_maps_to_user_facing_failure() -> None:
 
 
 def test_load_prompt_template_parses_front_matter() -> None:
-    template = load_prompt_template(
-        Path(
-            "src/agent_backend/capabilities/data_analysis/prompts/build_chart/base.v1.md"
-        )
-    )
+    template = load_prompt_template(Path("src/agent_backend/capabilities/data_analysis/prompts/system/base.v1.md"))
 
     assert template.agent_id == "data_analysis_agent"
-    assert template.node_id == "build_chart"
-    assert template.required_variables == [
-        "user_question",
-        "executed_sql",
-        "result_columns",
-        "result_summary",
-        "sample_rows",
-        "row_count",
-        "is_truncated",
-    ]
-    assert template.output_contract == "build_chart_result_v1"
+    assert template.node_id == "system"
+    assert template.required_variables == []
+    assert template.output_contract == "system_prompt_v1"
 
 
 def test_registry_detects_duplicate_active_templates(tmp_path: Path) -> None:

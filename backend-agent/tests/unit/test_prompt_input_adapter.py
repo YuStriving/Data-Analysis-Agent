@@ -11,7 +11,10 @@ from agent_backend.foundation.contracts.context import (
 from agent_backend.capabilities.agent_runtime.prompt import (
     MissingPromptInputSectionsError,
     build_prompt_request,
-    render_prompt,
+)
+from agent_backend.capabilities.agent_runtime.skills import (
+    SkillInputAdapter,
+    render_node_skill,
 )
 from agent_backend.foundation.access import AccessContext
 
@@ -68,16 +71,16 @@ def test_prompt_input_adapter_builds_generate_sql_request() -> None:
     assert request.variables["recent_context"]["previous_turn"]["last_question"] == "Show revenue"
 
 
-def test_prompt_input_adapter_result_renders_generate_sql_prompt() -> None:
-    prompt_request = build_prompt_request(
+def test_skill_input_adapter_result_renders_generate_sql_skill() -> None:
+    skill_request = SkillInputAdapter().build_skill_request(
         agent_id="data_analysis_agent",
         node_id="generate_sql",
         bundle=make_generate_sql_bundle(),
     )
 
-    result = render_prompt(prompt_request)
+    result = render_node_skill(skill_request)
 
-    assert result.template_id == "data_analysis.generate_sql.base"
+    assert result.skill_id == "data_analysis.generate_sql"
     assert result.output_contract == "generate_sql_result_v1"
     assert "{{" not in result.rendered_text
     assert "权限约束" in result.rendered_text

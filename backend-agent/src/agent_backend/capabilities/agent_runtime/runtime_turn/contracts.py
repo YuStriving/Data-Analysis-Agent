@@ -62,6 +62,11 @@ class RuntimeTurnResult(BaseModel):
     failure_message: str | None = None
     prompt_version: str | None = None
     rendered_prompt_hash: str | None = None
+    system_prompt_version: str | None = None
+    rendered_system_prompt_hash: str | None = None
+    skill_id: str | None = None
+    skill_version: str | None = None
+    rendered_skill_hash: str | None = None
     memory_event_ids: list[str] = Field(default_factory=list)
     runtime_event_count: int = 0
     warnings: list[str] = Field(default_factory=list)

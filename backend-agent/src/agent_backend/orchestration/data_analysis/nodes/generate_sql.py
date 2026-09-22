@@ -9,9 +9,12 @@ from agent_backend.capabilities.agent_runtime.prompt import (
     MissingPromptInputSectionsError,
     PromptBudgetGuard,
     PromptHubError,
-    PromptInputAdapter,
 )
-from agent_backend.capabilities.agent_runtime.prompt.contracts import PromptRenderRequest
+from agent_backend.capabilities.agent_runtime.skills import (
+    NodeSkillError,
+    SkillInputAdapter,
+    SkillRenderRequest,
+)
 from agent_backend.orchestration.data_analysis.nodes._shared import (
     append_event,
     complete_node,
@@ -42,9 +45,9 @@ def generate_sql(
         )
 
     try:
-        prompt_request = _build_prompt_request(state)
+        skill_request = _build_skill_request(state)
         step_result = execute_json_llm_step(
-            prompt_request=prompt_request,
+            skill_request=skill_request,
             model_client=model_client,
             prompt_budget_guard=prompt_budget_guard,
         )
@@ -57,7 +60,7 @@ def generate_sql(
             user_action_required=True,
             recoverable=True,
         )
-    except (ValidationError, PromptHubError) as exc:
+    except (ValidationError, PromptHubError, NodeSkillError) as exc:
         return fail_node(
             state,
             code="prompt_render_failed",
@@ -157,6 +160,8 @@ def generate_sql(
     analysis["generate_sql_result"] = model_output
     analysis["prompt_version"] = step_result.prompt_result.template_version
     analysis["rendered_prompt_hash"] = step_result.prompt_result.rendered_hash
+    _record_step_metadata(analysis, step_result)
+    _record_system_metadata(state, step_result)
     analysis["model"] = model_client.model_name
 
     if status == "ok":
@@ -219,9 +224,9 @@ def make_generate_sql_node(
     return _node
 
 
-def _build_prompt_request(state: AgentState) -> PromptRenderRequest:
+def _build_skill_request(state: AgentState) -> SkillRenderRequest:
     bundle = _context_bundle(state)
-    return PromptInputAdapter().build_prompt_request(
+    return SkillInputAdapter().build_skill_request(
         agent_id="data_analysis_agent",
         node_id="generate_sql",
         bundle=bundle,
@@ -240,6 +245,24 @@ def _context_bundle(state: AgentState) -> ContextBundle:
 def _record_prompt_metadata(state: AgentState, prompt_version: str, rendered_prompt_hash: str) -> None:
     state["prompt_version"] = prompt_version
     state["rendered_prompt_hash"] = rendered_prompt_hash
+    state["skill_version"] = prompt_version
+    state["rendered_skill_hash"] = rendered_prompt_hash
+
+
+def _record_system_metadata(state: AgentState, step_result) -> None:
+    if step_result.system_prompt_result is not None:
+        state["system_prompt_version"] = step_result.system_prompt_result.template_version
+        state["rendered_system_prompt_hash"] = step_result.system_prompt_result.rendered_hash
+
+
+def _record_step_metadata(analysis: dict, step_result) -> None:
+    if step_result.system_prompt_result is not None:
+        analysis["system_prompt_version"] = step_result.system_prompt_result.template_version
+        analysis["rendered_system_prompt_hash"] = step_result.system_prompt_result.rendered_hash
+    if step_result.skill_result is not None:
+        analysis["skill_id"] = step_result.skill_result.skill_id
+        analysis["skill_version"] = step_result.skill_result.skill_version
+        analysis["rendered_skill_hash"] = step_result.skill_result.rendered_hash
 
 
 def _append_warnings(state: AgentState, warnings: list[str]) -> None:

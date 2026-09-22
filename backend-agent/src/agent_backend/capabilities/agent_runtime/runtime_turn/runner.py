@@ -25,7 +25,10 @@ from agent_backend.capabilities.agent_runtime.prompt import (
     MissingPromptInputSectionsError,
     PromptBudgetGuard,
     PromptHubError,
-    PromptInputAdapter,
+)
+from agent_backend.capabilities.agent_runtime.skills import (
+    NodeSkillError,
+    SkillInputAdapter,
 )
 from agent_backend.capabilities.agent_runtime.runtime_turn.contracts import (
     RuntimeEventSink,
@@ -46,7 +49,7 @@ class RuntimeTurnDependencies:
     model_client: RuntimeModelClient
     schema_provider: RuntimeSchemaProvider
     context_builder: ContextBuilder | None = None
-    prompt_input_adapter: PromptInputAdapter | None = None
+    skill_input_adapter: SkillInputAdapter | None = None
     prompt_budget_guard: PromptBudgetGuard | None = None
 
 
@@ -57,7 +60,7 @@ class RuntimeTurnRunner:
     def __init__(self, dependencies: RuntimeTurnDependencies) -> None:
         self.dependencies = dependencies
         self.context_builder = dependencies.context_builder or ContextBuilder()
-        self.prompt_input_adapter = dependencies.prompt_input_adapter or PromptInputAdapter()
+        self.skill_input_adapter = dependencies.skill_input_adapter or SkillInputAdapter()
         self.prompt_budget_guard = dependencies.prompt_budget_guard or PromptBudgetGuard()
         self._event_seq = 0
 
@@ -66,6 +69,11 @@ class RuntimeTurnRunner:
         memory_event_ids: list[str] = []
         prompt_version: str | None = None
         rendered_prompt_hash: str | None = None
+        system_prompt_version: str | None = None
+        rendered_system_prompt_hash: str | None = None
+        skill_id: str | None = None
+        skill_version: str | None = None
+        rendered_skill_hash: str | None = None
         warnings: list[str] = []
 
         try:
@@ -106,6 +114,11 @@ class RuntimeTurnRunner:
                     memory_event_ids=memory_event_ids,
                     prompt_version=prompt_version,
                     rendered_prompt_hash=rendered_prompt_hash,
+                    system_prompt_version=system_prompt_version,
+                    rendered_system_prompt_hash=rendered_system_prompt_hash,
+                    skill_id=skill_id,
+                    skill_version=skill_version,
+                    rendered_skill_hash=rendered_skill_hash,
                     warnings=warnings,
                 )
 
@@ -123,13 +136,13 @@ class RuntimeTurnRunner:
             )
 
             self._publish(request, "prompt_rendering", "Rendering prompt.")
-            prompt_request = self.prompt_input_adapter.build_prompt_request(
+            skill_request = self.skill_input_adapter.build_skill_request(
                 agent_id=self.agent_id,
                 node_id=self.node_id,
                 bundle=context_result.bundle,
             )
             step_result = execute_json_llm_step(
-                prompt_request=prompt_request,
+                skill_request=skill_request,
                 model_client=self.dependencies.model_client,
                 prompt_budget_guard=self.prompt_budget_guard,
                 on_prompt_rendered=lambda result, budget_status, _warnings: self._publish(
@@ -139,6 +152,9 @@ class RuntimeTurnRunner:
                     {
                         "prompt_version": result.template_version,
                         "rendered_prompt_hash": result.rendered_hash,
+                        "skill_id": getattr(result, "skill_id", ""),
+                        "skill_version": getattr(result, "skill_version", result.template_version),
+                        "rendered_skill_hash": result.rendered_hash,
                         "budget_status": budget_status,
                     },
                 ),
@@ -156,6 +172,13 @@ class RuntimeTurnRunner:
             prompt_result = step_result.prompt_result
             prompt_version = prompt_result.template_version
             rendered_prompt_hash = prompt_result.rendered_hash
+            if step_result.system_prompt_result is not None:
+                system_prompt_version = step_result.system_prompt_result.template_version
+                rendered_system_prompt_hash = step_result.system_prompt_result.rendered_hash
+            if step_result.skill_result is not None:
+                skill_id = step_result.skill_result.skill_id
+                skill_version = step_result.skill_result.skill_version
+                rendered_skill_hash = step_result.skill_result.rendered_hash
             warnings.extend(step_result.warnings)
             if step_result.status == "prompt_budget_exceeded":
                 message = "Rendered prompt exceeded budget."
@@ -185,6 +208,11 @@ class RuntimeTurnRunner:
                     memory_event_ids=memory_event_ids,
                     prompt_version=prompt_version,
                     rendered_prompt_hash=rendered_prompt_hash,
+                    system_prompt_version=system_prompt_version,
+                    rendered_system_prompt_hash=rendered_system_prompt_hash,
+                    skill_id=skill_id,
+                    skill_version=skill_version,
+                    rendered_skill_hash=rendered_skill_hash,
                     warnings=warnings,
                 )
 
@@ -215,6 +243,11 @@ class RuntimeTurnRunner:
                     memory_event_ids=memory_event_ids,
                     prompt_version=prompt_version,
                     rendered_prompt_hash=rendered_prompt_hash,
+                    system_prompt_version=system_prompt_version,
+                    rendered_system_prompt_hash=rendered_system_prompt_hash,
+                    skill_id=skill_id,
+                    skill_version=skill_version,
+                    rendered_skill_hash=rendered_skill_hash,
                     warnings=warnings,
                 )
             if step_result.status == "model_output_invalid" or step_result.parsed_output is None:
@@ -236,6 +269,11 @@ class RuntimeTurnRunner:
                     memory_event_ids=memory_event_ids,
                     prompt_version=prompt_version,
                     rendered_prompt_hash=rendered_prompt_hash,
+                    system_prompt_version=system_prompt_version,
+                    rendered_system_prompt_hash=rendered_system_prompt_hash,
+                    skill_id=skill_id,
+                    skill_version=skill_version,
+                    rendered_skill_hash=rendered_skill_hash,
                     warnings=warnings,
                 )
             model_output = step_result.parsed_output
@@ -258,6 +296,11 @@ class RuntimeTurnRunner:
                     memory_event_ids=memory_event_ids,
                     prompt_version=prompt_version,
                     rendered_prompt_hash=rendered_prompt_hash,
+                    system_prompt_version=system_prompt_version,
+                    rendered_system_prompt_hash=rendered_system_prompt_hash,
+                    skill_id=skill_id,
+                    skill_version=skill_version,
+                    rendered_skill_hash=rendered_skill_hash,
                     warnings=warnings,
                 )
 
@@ -284,9 +327,14 @@ class RuntimeTurnRunner:
                 memory_event_ids=memory_event_ids,
                 prompt_version=prompt_version,
                 rendered_prompt_hash=rendered_prompt_hash,
+                system_prompt_version=system_prompt_version,
+                rendered_system_prompt_hash=rendered_system_prompt_hash,
+                skill_id=skill_id,
+                skill_version=skill_version,
+                rendered_skill_hash=rendered_skill_hash,
                 warnings=warnings,
             )
-        except (MissingPromptInputSectionsError, PromptHubError) as exc:
+        except (MissingPromptInputSectionsError, PromptHubError, NodeSkillError) as exc:
             message = str(exc)
             self._publish(
                 request,
@@ -310,6 +358,11 @@ class RuntimeTurnRunner:
                 memory_event_ids=memory_event_ids,
                 prompt_version=prompt_version,
                 rendered_prompt_hash=rendered_prompt_hash,
+                system_prompt_version=system_prompt_version,
+                rendered_system_prompt_hash=rendered_system_prompt_hash,
+                skill_id=skill_id,
+                skill_version=skill_version,
+                rendered_skill_hash=rendered_skill_hash,
                 warnings=warnings,
             )
         except Exception as exc:
@@ -330,6 +383,11 @@ class RuntimeTurnRunner:
                 memory_event_ids=memory_event_ids,
                 prompt_version=prompt_version,
                 rendered_prompt_hash=rendered_prompt_hash,
+                system_prompt_version=system_prompt_version,
+                rendered_system_prompt_hash=rendered_system_prompt_hash,
+                skill_id=skill_id,
+                skill_version=skill_version,
+                rendered_skill_hash=rendered_skill_hash,
                 warnings=warnings,
             )
 
@@ -496,6 +554,11 @@ class RuntimeTurnRunner:
         rendered_prompt_hash: str | None,
         memory_event_ids: list[str],
         warnings: list[str],
+        system_prompt_version: str | None = None,
+        rendered_system_prompt_hash: str | None = None,
+        skill_id: str | None = None,
+        skill_version: str | None = None,
+        rendered_skill_hash: str | None = None,
     ) -> RuntimeTurnResult:
         return RuntimeTurnResult(
             task_id=request.task_id,
@@ -509,6 +572,11 @@ class RuntimeTurnRunner:
             failure_message=failure_message,
             prompt_version=prompt_version,
             rendered_prompt_hash=rendered_prompt_hash,
+            system_prompt_version=system_prompt_version,
+            rendered_system_prompt_hash=rendered_system_prompt_hash,
+            skill_id=skill_id,
+            skill_version=skill_version,
+            rendered_skill_hash=rendered_skill_hash,
             memory_event_ids=list(memory_event_ids),
             runtime_event_count=self._event_seq,
             warnings=list(warnings),

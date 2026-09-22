@@ -150,6 +150,11 @@ def test_runtime_turn_runner_completes_generate_sql_prompt_flow() -> None:
     assert result.status == "completed"
     assert result.prompt_version == "v1"
     assert result.rendered_prompt_hash is not None
+    assert result.system_prompt_version == "v1"
+    assert result.rendered_system_prompt_hash is not None
+    assert result.skill_id == "data_analysis.generate_sql"
+    assert result.skill_version == "v1"
+    assert result.rendered_skill_hash == result.rendered_prompt_hash
     assert result.memory_event_ids == [
         "task-1:memory:question_received",
         "task-1:memory:answer_generated",
@@ -168,7 +173,9 @@ def test_runtime_turn_runner_completes_generate_sql_prompt_flow() -> None:
         "task_completed",
     ]
     assert len(model_client.requests) == 1
-    assert "权限约束" in model_client.requests[0].messages[0].content
+    assert [message.role for message in model_client.requests[0].messages] == ["system", "user"]
+    assert "全局规则" in model_client.requests[0].messages[0].content
+    assert "权限约束" in model_client.requests[0].messages[1].content
     pending_payloads = [json.loads(raw)["payload"]["event_type"] for raw in next(iter(redis_store.pending.values()))]
     assert pending_payloads == ["question_received", "answer_generated"]
 
@@ -197,6 +204,8 @@ def test_runtime_turn_runner_stops_when_prompt_budget_is_exceeded() -> None:
 
     assert result.status == "context_budget_exceeded"
     assert result.rendered_prompt_hash is not None
+    assert result.rendered_system_prompt_hash is not None
+    assert result.skill_id == "data_analysis.generate_sql"
     assert result.warnings == ["rendered_prompt_exceeded_budget"]
     assert len(model_client.requests) == 0
     assert "context_budget_exceeded" in [event.event_type for event in event_sink.events]

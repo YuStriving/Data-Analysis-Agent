@@ -129,22 +129,27 @@ Do not merge these packages into one generic utils directory.
 
 ## 5. Prompt and Context Rules
 
-- prompts must be versioned
+- system prompts and Node Skills must be versioned
 - context must be compact and permission-scoped
-- prompt templates must live outside core business logic
-- every tool-facing prompt must define a structured output target
-- prompt templates live under concrete capability packages, such as
-  `capabilities/data_analysis/prompts/{node_id}/base.v1.md`
-- prompt templates use Markdown with `---` front matter for metadata,
-  required variables, optional variables, and output contract
-- prompt loading and rendering must go through
+- system prompts and Node Skills must live outside core business logic
+- system prompts live under concrete capability packages, such as
+  `capabilities/data_analysis/prompts/system/base.v1.md`
+- Node Skills live under concrete capability packages, such as
+  `capabilities/data_analysis/skills/{node_id}/base.v1.md`
+- system prompts and Node Skills use Markdown with `---` front matter for
+  metadata and versioning
+- system prompt loading and rendering must go through
   `capabilities/agent_runtime/prompt`, not ad hoc string concatenation inside
   graph nodes
-- every LLM node should receive the active `system` prompt and its node prompt
-  so each node can be replayed and evaluated independently
-- missing required prompt variables must fail before model invocation and be
+- Node Skill loading and rendering must go through
+  `capabilities/agent_runtime/skills`, using explicit node binding or static
+  path mapping; this stage does not use Skill registration or discovery
+- every LLM node should receive the active `system` prompt as a `system`
+  message and its Node Skill plus scoped context as a node task message, so
+  each node can be replayed and evaluated independently
+- missing required Node Skill context must fail before model invocation and be
   mapped by workflow/lifecycle into a user-friendly message
-- all current `data_analysis_agent` node prompts must require JSON output
+- all current `data_analysis_agent` Node Skills must require JSON output
 - unsupported or unsafe requests must fail explicitly
 - context injection must follow task-type policies; recovery tasks use `checkpoint_first`
 - multi-turn analysis context is scoped by `session_id`
@@ -169,15 +174,16 @@ Do not merge these packages into one generic utils directory.
 - model-backed workflow nodes must use
   `capabilities/agent_runtime/execution/execute_json_llm_step()` unless a
   stronger node-specific execution helper is introduced
-- `execute_json_llm_step()` is responsible for prompt rendering, prompt budget
-  checks, LLM request adaptation, provider error capture, raw output capture,
-  and JSON object parsing
+- `execute_json_llm_step()` is responsible for system prompt rendering, Node
+  Skill rendering, prompt budget checks, LLM request adaptation, provider error
+  capture, raw output capture, and JSON object parsing
 - model clients must be injected as `LlmClient`; graph nodes must not import
   provider SDKs, read API keys, or construct provider-specific clients
 - JSON model outputs must be validated against node-owned contracts such as
   `GenerateSqlResult` before mutating analysis state
-- prompt version and rendered prompt hash must be recorded for replay,
-  debugging, and evals
+- `system_prompt_*` and `skill_*` metadata must be recorded for replay,
+  debugging, and evals; legacy `prompt_version` and `rendered_prompt_hash`
+  may remain during migration as aliases for the active Node Skill
 
 ## 6. Tooling Rules
 

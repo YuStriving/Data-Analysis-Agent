@@ -40,7 +40,7 @@ package-dir = {"" = "."}
 where = ["src"]
 
 [tool.setuptools.package-data]
-"agent_backend.capabilities.data_analysis" = ["prompts/**/*.md"]
+"agent_backend.capabilities.data_analysis" = ["prompts/**/*.md", "skills/**/*.md"]
 
 [tool.pytest.ini_options]
 pythonpath = ["src"]

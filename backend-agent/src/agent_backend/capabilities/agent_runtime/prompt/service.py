@@ -25,6 +25,16 @@ def render_prompt(request: PromptRenderRequest) -> PromptRenderResult:
     return PromptRenderer().render(template, request)
 
 
+def render_system_prompt(agent_id: str, variables: dict[str, object] | None = None) -> PromptRenderResult:
+    return render_prompt(
+        PromptRenderRequest(
+            agent_id=agent_id,
+            node_id="system",
+            variables=dict(variables or {}),
+        )
+    )
+
+
 def map_prompt_error_to_user_failure(error: MissingPromptVariablesError) -> UserFacingFailure:
     missing = set(error.missing_variables)
 

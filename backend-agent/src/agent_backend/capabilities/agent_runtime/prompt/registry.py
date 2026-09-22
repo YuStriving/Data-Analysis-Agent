@@ -28,7 +28,7 @@ class PromptRegistry:
         for root in self.template_roots:
             if not root.exists():
                 continue
-            for path in root.glob("*/prompts/**/*.md"):
+            for path in root.glob("*/prompts/system/**/*.md"):
                 if not has_front_matter(path):
                     continue
                 template = load_prompt_template(path)

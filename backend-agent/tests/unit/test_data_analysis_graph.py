@@ -161,7 +161,8 @@ def test_data_analysis_graph_injects_llm_client_into_generate_sql() -> None:
     assert result["analysis"]["sql_validation"]["referenced_relations"] == ["sales"]
     assert result["analysis"]["model"] == "fake-model"
     assert len(model_client.requests) == 1
-    assert "Show monthly revenue trend" in model_client.requests[0].messages[0].content
+    assert [message.role for message in model_client.requests[0].messages] == ["system", "user"]
+    assert "Show monthly revenue trend" in model_client.requests[0].messages[1].content
 
 
 def test_data_analysis_graph_reads_schema_then_generates_sql(tmp_path: Path) -> None:

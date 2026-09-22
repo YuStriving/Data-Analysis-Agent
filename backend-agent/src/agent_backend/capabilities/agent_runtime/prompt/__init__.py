@@ -28,6 +28,7 @@ from agent_backend.capabilities.agent_runtime.prompt.input_adapter import (
 from agent_backend.capabilities.agent_runtime.prompt.service import (
     map_prompt_error_to_user_failure,
     render_prompt,
+    render_system_prompt,
 )
 
 __all__ = [
@@ -50,5 +51,6 @@ __all__ = [
     "check_rendered_prompt_budget",
     "map_prompt_error_to_user_failure",
     "render_prompt",
+    "render_system_prompt",
 ]
 
