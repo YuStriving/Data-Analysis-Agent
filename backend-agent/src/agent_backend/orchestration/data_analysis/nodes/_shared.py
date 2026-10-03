@@ -42,6 +42,7 @@ def fail_node(
     failure_stage: str,
     user_action_required: bool,
     recoverable: bool,
+    tool_error: dict[str, Any] | None = None,
 ) -> AgentState:
     graph = _ensure_graph(state)
     error = _ensure_error(state)
@@ -60,16 +61,20 @@ def fail_node(
     state["node_status"] = "failed"
     state["next_node"] = "fail_task"
     state["failure_stage"] = failure_stage
+    payload: dict[str, Any] = {
+        "error_code": code,
+        "message": message,
+        "failure_stage": failure_stage,
+        "user_action_required": user_action_required,
+        "recoverable": recoverable,
+    }
+    if tool_error is not None:
+        error["tool_error"] = tool_error
+        payload["tool_error"] = tool_error
     append_event(
         state,
         "task_failed",
-        {
-            "error_code": code,
-            "message": message,
-            "failure_stage": failure_stage,
-            "user_action_required": user_action_required,
-            "recoverable": recoverable,
-        },
+        payload,
         level="error",
     )
     return state

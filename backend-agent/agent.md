@@ -108,6 +108,22 @@ own `agent_runtime` capability packages.
 
 Do not merge these packages into one generic utils directory.
 
+### 3.1 Generic Runtime and Business Injection
+
+- follow root `agent.md` section 14.1 when designing Python runtime capabilities
+- `capabilities/agent_runtime` owns generic contracts and reusable execution
+  mechanisms; concrete capability modules such as `capabilities/data_analysis`
+  own their business rules, tools, and resource adapters
+- generic runtime modules must not import concrete capability implementations,
+  construct business tools internally, or dispatch through hardcoded business names
+- inject business implementations, handlers, and policies at factories, graph
+  builders, or application entrypoints; keep those assembly dependencies explicit
+- new development and changes to existing modules must follow this dependency
+  direction; migrate existing coupling within the affected scope rather than
+  triggering an unrelated repository-wide rewrite
+- prefer the smallest typed seam that fits the actual consumers; business tools
+  do not need to inherit from the generic executor
+
 ## 4. Permission Rules
 
 - trust only the access context produced by Java
@@ -187,8 +203,51 @@ Do not merge these packages into one generic utils directory.
 
 ## 6. Tooling Rules
 
-- every tool must declare input and output schema
-- every tool must have timeout and retry policy
+- `BusinessTool` only declares `name`, `description`, `input_args`, and
+  `execute(args, context)`; `input_args` is the input JSON Schema, separate from
+  actual invocation arguments, and no `definition()` method is required
+- tools do not need to inherit from this Protocol or `ToolExecutor`; registry
+  and runtime lookups return the business objects without a duplicate definition model
+- `ToolRegistry` directly stores business tool objects with independent
+  `ToolExecutionOptions`; version, output schema, and timeout are injected at
+  registration and never required on `BusinessTool`
+- `ToolCallRequest` composes tool_name, args, and context; tool_version is read
+  from context. Preserve concrete context objects and serialized business fields
+- `DataAnalysisToolExecutionContext` and `DatasetScope` live in business
+  `data_analysis/tools/contracts.py`; generic contexts do not require dataset fields
+- `ToolExecutionContext` carries call identity and requested tool version, task and trace identifiers,
+  session and user scope, nonblank goal and purpose, granted permissions, and an optional timeout override
+- `ToolExecutor.execute(tool, raw_input, context)` owns input parsing, schema
+  validation, injected policy checks, sync/async execution, timeout handling,
+  error normalization, and the successful `ToolCallResult`;
+  it requires fixed ToolExecutionOptions and an explicit authorization callable;
+  it accepts dict or Pydantic model input and never looks up tools itself
+- successful results only contain call identity, tool name/version, and business
+  data; failures raise `ToolCallError` with `reason`, `message`, `retryable`,
+  and `detail`, and callers can obtain these four fields with `to_payload()`
+- preserve existing `ToolCallError` instances and propagate task cancellation;
+  timeout errors are retryable, but this module never automatically retries
+- tool calling has no dedicated lifecycle logger or log policy; event emission
+  and browser display belong to the outer integration layer. Tool error payloads
+  are preserved in failed node/task results; the Python-to-Java-to-browser SSE
+  path for these errors is not implemented yet
+- `ToolCallingRuntime` resolves the business tool and delegates this lifecycle
+  to `ToolExecutor`; generic tool modules do not inspect SQL or dataset fields
+- Core `ToolAuthorizationGate` lives in `execution_control` and owns capability,
+  agent/node, permission, risk, and review checks through injected AgentSpec and
+  policy resolvers. Both runtime and standalone executors must invoke the Gate
+- the data-analysis factory injects `DataAnalysisToolPolicyChecker` for dataset
+  scope/type and readonly-SQL checks; it does not duplicate public authorization
+- task identity must match the Java-issued access context before tool execution
+- future generic Guard adapters can replace the injected checker independently
+  of the minimal business tool interface; unknown business access policies deny execution
+- business policy migration is a separate scoped change: move domain rules out
+  of generic modules without bypassing existing permission or SQL safety checks
+- every tool must declare input schema; assembly must supply output schema
+  through execution options
+- assembly must supply timeout independently of tool metadata
+- successful output must be non-None and JSON serializable; synchronous thread
+  timeouts stop waiting but do not guarantee the worker thread has terminated
 - every tool result must be serializable
 - SQL tools must enforce read-only restrictions
 - chart tools must output a generic chart spec, not a frontend-library-specific option
@@ -358,6 +417,10 @@ Automatic updates are not allowed for:
 
 ## 12. Validation and Documentation Rules
 
+- TODO development behavior rules and spec documents are maintained together
+  under repository-root `spec/`; follow [the collaboration agreement](../spec/README.md)
+- test plans, detailed cases, and validation records are centralized under
+  repository-root `tests/`; executable tests remain in the module tests directory
 - before publishing Python runtime changes, run the most relevant targeted
   pytest and ruff checks for the affected packages
 - `scripts/ci/verify.ps1` is the repository aggregate verification entrypoint

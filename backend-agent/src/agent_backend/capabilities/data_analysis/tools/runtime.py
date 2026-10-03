@@ -8,11 +8,21 @@ from urllib.parse import unquote, urlparse
 from sqlalchemy import URL, create_engine
 from sqlalchemy.engine import Engine
 
+from agent_backend.capabilities.agent_runtime.execution_control import (
+    ToolAuthorizationGate,
+    build_data_analysis_agent_spec,
+)
 from agent_backend.capabilities.agent_runtime.tool_calling.runtime import (
     ToolCallingRuntime,
 )
 from agent_backend.capabilities.data_analysis.contracts import (
     validate_dataset_metadata,
+)
+from agent_backend.capabilities.data_analysis.tools.config import (
+    build_data_analysis_tool_access_policies,
+)
+from agent_backend.capabilities.data_analysis.tools.policy import (
+    DataAnalysisToolPolicyChecker,
 )
 from agent_backend.capabilities.data_analysis.tools.registry import (
     EngineResolver,
@@ -41,7 +51,24 @@ def build_data_analysis_tool_runtime(
         file_resolver=file_resolver,
         relation_store=relation_store,
     )
-    return ToolCallingRuntime(registry)
+    gate = build_data_analysis_tool_authorization_gate()
+    return ToolCallingRuntime(
+        registry,
+        authorize=gate.check,
+        access_policy_resolver=gate.get_policy,
+    )
+
+
+def build_data_analysis_tool_authorization_gate() -> ToolAuthorizationGate:
+    checker = DataAnalysisToolPolicyChecker(build_data_analysis_tool_access_policies())
+    spec = build_data_analysis_agent_spec()
+    return ToolAuthorizationGate(
+        agent_spec_resolver=lambda name, version: (
+            spec if name == spec.agent_id and version == "v1" else None
+        ),
+        policy_resolver=checker.get_policy,
+        business_check=checker.check,
+    )
 
 
 def build_default_data_analysis_tool_runtime(
@@ -49,7 +76,9 @@ def build_default_data_analysis_tool_runtime(
     *,
     relation_store: InMemoryRelationStore | None = None,
 ) -> ToolCallingRuntime:
-    metadata_by_id = dataset_metadata_by_id if dataset_metadata_by_id is not None else {}
+    metadata_by_id = (
+        dataset_metadata_by_id if dataset_metadata_by_id is not None else {}
+    )
     runtime = build_data_analysis_tool_runtime(
         engine_resolver=build_engine_resolver_from_dataset_metadata(metadata_by_id),
         file_resolver=build_file_resolver_from_dataset_metadata(metadata_by_id),
@@ -100,7 +129,9 @@ def build_engine_resolver_from_dataset_metadata(
     return _resolve
 
 
-def _file_ref_path_map(dataset_metadata_by_id: DatasetMetadataById) -> dict[str, str | Path]:
+def _file_ref_path_map(
+    dataset_metadata_by_id: DatasetMetadataById,
+) -> dict[str, str | Path]:
     mapping: dict[str, str | Path] = {}
     for raw_metadata in dataset_metadata_by_id.values():
         metadata = validate_dataset_metadata(dict(raw_metadata)).to_runtime_metadata()
@@ -142,7 +173,12 @@ def _resolve_local_file_ref(file_ref: str) -> str | Path:
 
 
 def _looks_like_windows_path(value: str) -> bool:
-    return len(value) >= 3 and value[1] == ":" and value[0].isalpha() and value[2] in {"\\", "/"}
+    return (
+        len(value) >= 3
+        and value[1] == ":"
+        and value[0].isalpha()
+        and value[2] in {"\\", "/"}
+    )
 
 
 def _mysql_engine_url(metadata: Mapping[str, Any]) -> URL | str:
@@ -175,7 +211,9 @@ def _mysql_engine_url(metadata: Mapping[str, Any]) -> URL | str:
     )
 
 
-def _required_str(mapping: Mapping[str, Any], key: str, *, default: str | None = None) -> str:
+def _required_str(
+    mapping: Mapping[str, Any], key: str, *, default: str | None = None
+) -> str:
     value = mapping.get(key, default)
     if not isinstance(value, str) or not value.strip():
         raise ValueError(f"MySQL connection field is required: {key}")

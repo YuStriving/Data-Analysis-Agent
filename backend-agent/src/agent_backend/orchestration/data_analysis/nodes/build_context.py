@@ -8,6 +8,23 @@ from uuid import uuid4
 from pydantic import ValidationError
 
 from agent_backend.capabilities.agent_runtime.context.builder import ContextBuilder
+from agent_backend.capabilities.agent_runtime.context.policies import (
+    resolve_context_policy,
+)
+from agent_backend.capabilities.agent_runtime.tool_calling.contracts import (
+    ToolCallRequest,
+    ToolCallResult,
+)
+from agent_backend.capabilities.agent_runtime.tool_calling.errors import ToolCallError
+from agent_backend.capabilities.agent_runtime.tool_calling.runtime import (
+    ToolCallingRuntime,
+)
+from agent_backend.capabilities.data_analysis.contracts import validate_dataset_metadata
+from agent_backend.capabilities.data_analysis.tools.contracts import (
+    DataAnalysisToolExecutionContext,
+    DatasetScope,
+)
+from agent_backend.foundation.access import AccessContext
 from agent_backend.foundation.contracts.context import (
     ContextIdentity,
     ContextSource,
@@ -15,18 +32,6 @@ from agent_backend.foundation.contracts.context import (
     RequestContext,
     SchemaContext,
 )
-from agent_backend.capabilities.agent_runtime.context.policies import (
-    resolve_context_policy,
-)
-from agent_backend.capabilities.agent_runtime.tool_calling.contracts import (
-    DatasetScope,
-    ToolCallRequest,
-)
-from agent_backend.capabilities.agent_runtime.tool_calling.runtime import (
-    ToolCallingRuntime,
-)
-from agent_backend.capabilities.data_analysis.contracts import validate_dataset_metadata
-from agent_backend.foundation.access import AccessContext
 from agent_backend.orchestration.data_analysis.nodes._shared import (
     append_event,
     complete_node,
@@ -60,7 +65,9 @@ def build_context(
             recoverable=True,
         )
 
-    metadata = (dataset_metadata_resolver or _resolve_dataset_metadata)(state, selected_dataset_id)
+    metadata = (dataset_metadata_resolver or _resolve_dataset_metadata)(
+        state, selected_dataset_id
+    )
     if metadata is None:
         return fail_node(
             state,
@@ -72,7 +79,9 @@ def build_context(
         )
 
     try:
-        dataset_metadata = validate_dataset_metadata(metadata, expected_dataset_id=selected_dataset_id)
+        dataset_metadata = validate_dataset_metadata(
+            metadata, expected_dataset_id=selected_dataset_id
+        )
     except (ValidationError, ValueError) as exc:
         return fail_node(
             state,
@@ -95,16 +104,17 @@ def build_context(
             recoverable=True,
         )
 
-    tool_result = _call_schema_tool(state, runtime, metadata)
-    if not tool_result.success:
-        error_message = tool_result.error.message if tool_result.error is not None else "Schema tool call failed."
+    try:
+        tool_result = _call_schema_tool(state, runtime, metadata)
+    except ToolCallError as exc:
         return fail_node(
             state,
             code="schema_context_not_found",
-            message=error_message,
+            message=exc.message,
             failure_stage="build_context",
             user_action_required=False,
             recoverable=True,
+            tool_error=exc.to_payload(),
         )
 
     schema_tool_data = dict(tool_result.data)
@@ -171,37 +181,59 @@ def make_build_context_node(
     return _node
 
 
-def _call_schema_tool(state: AgentState, runtime: ToolCallingRuntime, metadata: dict[str, Any]):
+def _call_schema_tool(
+    state: AgentState, runtime: ToolCallingRuntime, metadata: dict[str, Any]
+) -> ToolCallResult:
     request = _schema_tool_request(state, metadata)
     return asyncio.run(runtime.call(request))
 
 
-def _schema_tool_request(state: AgentState, metadata: dict[str, Any]) -> ToolCallRequest:
+def _schema_tool_request(
+    state: AgentState, metadata: dict[str, Any]
+) -> ToolCallRequest:
     task = state.get("task", {})
     access_context = dict(task.get("access_context", {}))
     selected_dataset_id = str(state.get("context", {}).get("selected_dataset_id"))
     dataset_type = str(metadata.get("dataset_type", ""))
     args = _schema_tool_args(selected_dataset_id, dataset_type, metadata)
+    if any(
+        task.get(key) != access_context.get(key) for key in ("tenant_id", "user_id")
+    ):
+        raise ToolCallError(
+            "Task identity mismatch",
+            "Task identity does not match the Java authorization context.",
+        )
+    if access_context.get("readonly") is not True:
+        raise ToolCallError(
+            "Readonly required",
+            "Tool calls require a readonly Java authorization context.",
+        )
     return ToolCallRequest(
-        tool_call_id=f"schema-{uuid4().hex}",
         tool_name=_schema_tool_name(dataset_type),
-        tool_version="v1",
-        agent_name="data_analysis_agent",
-        agent_version="v1",
-        node_id="build_context",
-        task_id=str(task.get("task_id", state.get("task_id", ""))),
-        trace_id=str(task.get("trace_id", state.get("trace_id", ""))),
-        session_id=str(task.get("session_id", state.get("session_id", ""))),
-        tenant_id=str(task.get("tenant_id", state.get("tenant_id", ""))),
-        user_id=str(task.get("user_id", state.get("user_id", ""))),
-        dataset_scope=DatasetScope(
-            selected_dataset_id=selected_dataset_id,
-            allowed_dataset_ids=list(access_context.get("allowed_dataset_ids", [])),
-            dataset_types={selected_dataset_id: dataset_type},
-            permissions=["dataset:read"],
-        ),
         args=args,
-        timeout_ms=int(metadata.get("schema_timeout_ms", 10000)),
+        context=DataAnalysisToolExecutionContext(
+            tool_call_id=f"schema-{uuid4().hex}",
+            tool_version="v1",
+            agent_name="data_analysis_agent",
+            agent_version="v1",
+            node_id="build_context",
+            task_id=str(task.get("task_id", state.get("task_id", ""))),
+            trace_id=str(task.get("trace_id", state.get("trace_id", ""))),
+            session_id=str(task.get("session_id", state.get("session_id", ""))),
+            tenant_id=str(task.get("tenant_id", state.get("tenant_id", ""))),
+            user_id=str(task.get("user_id", state.get("user_id", ""))),
+            goal=str(task.get("question", "")),
+            purpose="Read the authorized dataset schema to supply field evidence for SQL generation.",
+            permissions=["dataset:read"]
+            if selected_dataset_id in access_context.get("allowed_dataset_ids", [])
+            else [],
+            dataset_scope=DatasetScope(
+                selected_dataset_id=selected_dataset_id,
+                allowed_dataset_ids=list(access_context.get("allowed_dataset_ids", [])),
+                dataset_types={selected_dataset_id: dataset_type},
+            ),
+            timeout_ms=int(metadata.get("schema_timeout_ms", 10000)),
+        ),
     )
 
 
@@ -213,7 +245,9 @@ def _schema_tool_name(dataset_type: str) -> str:
     return "unsupported.schema_reader"
 
 
-def _schema_tool_args(dataset_id: str, dataset_type: str, metadata: dict[str, Any]) -> dict[str, Any]:
+def _schema_tool_args(
+    dataset_id: str, dataset_type: str, metadata: dict[str, Any]
+) -> dict[str, Any]:
     if dataset_type == "mysql":
         args: dict[str, Any] = {
             "dataset_id": dataset_id,
@@ -302,7 +336,9 @@ def _schema_context_from_relations(relations: list[dict[str, Any]]) -> SchemaCon
     )
 
 
-def _dataset_context(metadata: dict[str, Any], selected_dataset_id: str) -> dict[str, Any]:
+def _dataset_context(
+    metadata: dict[str, Any], selected_dataset_id: str
+) -> dict[str, Any]:
     return {
         "dataset_id": selected_dataset_id,
         "dataset_type": metadata.get("dataset_type"),
@@ -311,12 +347,17 @@ def _dataset_context(metadata: dict[str, Any], selected_dataset_id: str) -> dict
     }
 
 
-def _resolve_dataset_metadata(state: AgentState, dataset_id: str) -> dict[str, Any] | None:
+def _resolve_dataset_metadata(
+    state: AgentState, dataset_id: str
+) -> dict[str, Any] | None:
     context = state.get("context", {})
     by_id = context.get("dataset_metadata_by_id")
     if isinstance(by_id, dict) and isinstance(by_id.get(dataset_id), dict):
         return dict(by_id[dataset_id])
     metadata = context.get("dataset_metadata")
-    if isinstance(metadata, dict) and metadata.get("dataset_id", dataset_id) == dataset_id:
+    if (
+        isinstance(metadata, dict)
+        and metadata.get("dataset_id", dataset_id) == dataset_id
+    ):
         return dict(metadata)
     return None

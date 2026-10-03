@@ -6,13 +6,24 @@ from pathlib import Path
 import pytest
 from sqlalchemy import create_engine, text
 
-from agent_backend.capabilities.agent_runtime.tool_calling import DatasetScope, ToolCallRequest, ToolCallingRuntime, ToolRegistry
+from agent_backend.capabilities.agent_runtime.tool_calling import (
+    ToolCallingRuntime,
+    ToolCallRequest,
+    ToolExecutionContext,
+    ToolRegistry,
+)
 from agent_backend.capabilities.data_analysis.tools.chart import ChartSpecBuilderTool
-from agent_backend.capabilities.data_analysis.tools.mysql import MySQLQueryExecutorTool, MySQLSchemaReaderTool
+from agent_backend.capabilities.data_analysis.tools.mysql import (
+    MySQLQueryExecutorTool,
+    MySQLSchemaReaderTool,
+)
 from agent_backend.capabilities.data_analysis.tools.relation import (
     FileRelationNormalizerTool,
     InMemoryRelationStore,
     RelationQueryExecutorTool,
+)
+from agent_backend.capabilities.data_analysis.tools.runtime import (
+    build_data_analysis_tool_authorization_gate,
 )
 
 
@@ -23,7 +34,9 @@ def test_mysql_schema_reader_returns_relation_schema() -> None:
         connection.execute(text("INSERT INTO sales VALUES ('east', 10)"))
     tool = MySQLSchemaReaderTool(lambda dataset_id: engine)
 
-    result = tool.execute({"dataset_id": "dataset-1", "include_sample_values": True, "sample_rows": 1})
+    result = tool.execute(
+        {"dataset_id": "dataset-1", "include_sample_values": True, "sample_rows": 1}
+    )
 
     assert result["relations"][0]["relation_name"] == "sales"
     assert result["relations"][0]["columns"][0]["name"] == "region"
@@ -37,7 +50,9 @@ def test_mysql_query_executor_enforces_max_rows() -> None:
         connection.execute(text("INSERT INTO sales VALUES ('east', 10), ('west', 20)"))
     tool = MySQLQueryExecutorTool(lambda dataset_id: engine)
 
-    result = tool.execute({"dataset_id": "dataset-1", "sql": "SELECT * FROM sales", "max_rows": 1})
+    result = tool.execute(
+        {"dataset_id": "dataset-1", "sql": "SELECT * FROM sales", "max_rows": 1}
+    )
 
     assert result["row_count"] == 1
     assert result["truncated"]
@@ -49,7 +64,9 @@ def test_file_relation_normalizer_maps_csv_to_safe_names(tmp_path: Path) -> None
     store = InMemoryRelationStore()
     tool = FileRelationNormalizerTool(store=store)
 
-    result = tool.execute({"dataset_id": "dataset-1", "dataset_type": "csv", "file_ref": str(path)})
+    result = tool.execute(
+        {"dataset_id": "dataset-1", "dataset_type": "csv", "file_ref": str(path)}
+    )
 
     relation = result["relations"][0]
     assert relation["relation_name"] == "relation_1"
@@ -64,7 +81,9 @@ def test_relation_query_executor_uses_duckdb(tmp_path: Path) -> None:
     path.write_text("地区,销售金额(元)\n华东,120\n华北,90\n", encoding="utf-8")
     store = InMemoryRelationStore()
     normalizer = FileRelationNormalizerTool(store=store)
-    normalized = normalizer.execute({"dataset_id": "dataset-1", "dataset_type": "csv", "file_ref": str(path)})
+    normalized = normalizer.execute(
+        {"dataset_id": "dataset-1", "dataset_type": "csv", "file_ref": str(path)}
+    )
     tool = RelationQueryExecutorTool(store=store)
 
     result = tool.execute(
@@ -90,7 +109,10 @@ def test_chart_spec_builder_truncates_data() -> None:
                     {"name": "col_1", "display_name": "地区", "type": "object"},
                     {"name": "col_2", "display_name": "销售金额", "type": "int64"},
                 ],
-                "rows": [{"col_1": "华东", "col_2": 120}, {"col_1": "华北", "col_2": 90}],
+                "rows": [
+                    {"col_1": "华东", "col_2": 120},
+                    {"col_1": "华北", "col_2": 90},
+                ],
             },
             "max_points": 1,
         }
@@ -103,24 +125,34 @@ def test_chart_spec_builder_truncates_data() -> None:
 
 
 def test_runtime_can_call_chart_tool_without_dataset_scope() -> None:
-    runtime = ToolCallingRuntime(ToolRegistry([ChartSpecBuilderTool()]))
+    tool = ChartSpecBuilderTool()
+    gate = build_data_analysis_tool_authorization_gate()
+    runtime = ToolCallingRuntime(
+        ToolRegistry([tool]),
+        authorize=gate.check,
+        access_policy_resolver=gate.get_policy,
+    )
     request = ToolCallRequest(
-        tool_call_id="call-1",
         tool_name="chart.spec_builder",
-        tool_version="v1",
-        agent_name="data_analysis_agent",
-        agent_version="v1",
-        node_id="build_chart",
-        task_id="task-1",
-        trace_id="trace-1",
-        session_id="session-1",
-        tenant_id="tenant-1",
-        user_id="user-1",
-        dataset_scope=DatasetScope(),
         args={"query_result": {"columns": [], "rows": []}},
-        timeout_ms=1000,
+        context=ToolExecutionContext(
+            tool_call_id="call-1",
+            tool_version="v1",
+            agent_name="data_analysis_agent",
+            agent_version="v1",
+            node_id="build_chart",
+            task_id="task-1",
+            trace_id="trace-1",
+            session_id="session-1",
+            tenant_id="tenant-1",
+            user_id="user-1",
+            timeout_ms=1000,
+            permissions=[],
+            goal="Analyze sales",
+            purpose="Execute the selected analysis step",
+        ),
     )
 
     result = asyncio.run(runtime.call(request))
 
-    assert result.success
+    assert result.data["chart"]["type"] == "table"

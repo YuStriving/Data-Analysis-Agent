@@ -2,7 +2,6 @@ from __future__ import annotations
 
 from typing import Any, Literal, TypedDict
 
-
 DatasetSelectionSource = Literal["explicit", "session", "none"]
 RequestSource = Literal["http", "kafka", "resume", "unknown"]
 
@@ -62,6 +61,7 @@ class ErrorState(TypedDict, total=False):
     failure_stage: str | None
     user_action_required: bool
     recoverable: bool
+    tool_error: dict[str, Any]
 
 
 class AgentState(TypedDict, total=False):

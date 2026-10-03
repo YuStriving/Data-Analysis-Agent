@@ -8,7 +8,7 @@ The first version uses eight MVP nodes:
 2. `build_context`
 3. `generate_sql`
 4. `validate_sql`
-5. `run_query`
+5. `execute_sql`
 6. `interpret_result`
 7. `build_chart`
 8. `persist_result`
@@ -34,6 +34,28 @@ metadata authority; Python only uses the selected dataset metadata to create a
 read-only Engine, read schema, and continue into LLM SQL generation. Callers
 may still provide a custom `tool_runtime` when they need a specialized engine,
 file, or relation-store lifecycle.
+
+Dataset metadata is validated by `DatasetMetadata` before `build_context`
+calls schema tools. The preferred state shape is:
+
+```python
+state["context"]["dataset_metadata_by_id"] = {
+    "dataset-sales": {
+        "dataset_id": "dataset-sales",
+        "dataset_type": "mysql",
+        "display_name": "Sales",
+        "mysql": {"sqlalchemy_url": "mysql+pymysql://readonly:***@host:3306/db"},
+    }
+}
+```
+
+Single-dataset tasks may also provide `state["context"]["dataset_metadata"]`,
+but new integrations should prefer `dataset_metadata_by_id` so the structure can
+support future multi-dataset workflows.
+
+For file datasets, the MVP contract requires `file_ref`. If `file_ref` uses
+`oss://`, Python also requires `local_path`; later production integration should
+replace that with Java-issued signed URLs or short-lived file access.
 
 Reserved extension points:
 

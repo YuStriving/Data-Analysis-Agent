@@ -2,7 +2,10 @@ from __future__ import annotations
 
 from typing import Any
 
-from agent_backend.capabilities.agent_runtime.tool_calling.contracts import ToolDefinition
+from agent_backend.capabilities.agent_runtime.tool_calling.contracts import (
+    InputArgsDefinition,
+    ToolExecutionContext,
+)
 
 
 def build_line_chart(title: str) -> dict:
@@ -15,41 +18,24 @@ def build_line_chart(title: str) -> dict:
 
 
 class ChartSpecBuilderTool:
-    def definition(self) -> ToolDefinition:
-        return ToolDefinition(
-            name="chart.spec_builder",
-            version="v1",
-            description="Build frontend-neutral chart specs from a QueryResult.",
-            input_schema={
-                "type": "object",
-                "properties": {
-                    "query_result": {"type": "object"},
-                    "chart_type": {"type": "string", "enum": ["bar", "line", "pie", "table"]},
-                    "intent": {"type": "string"},
-                    "field_mapping": {"type": "object"},
-                    "max_points": {"type": "integer", "minimum": 1},
-                },
-                "required": ["query_result"],
-                "additionalProperties": False,
-            },
-            output_schema={
-                "type": "object",
-                "properties": {
-                    "chart": {"type": "object"},
-                    "warnings": {"type": "array"},
-                },
-                "required": ["chart", "warnings"],
-            },
-            allowed_agents=["data_analysis_agent"],
-            allowed_nodes=["build_chart"],
-            supported_dataset_types=[],
-            required_permissions=[],
-            timeout_ms=5000,
-            tags=["chart", "spec"],
-            risk_level="low",
-        )
+    name = "chart.spec_builder"
+    description = "Build frontend-neutral chart specs from a QueryResult."
 
-    def execute(self, args: dict[str, Any]) -> dict[str, Any]:
+    def __init__(self) -> None:
+        self.input_args: InputArgsDefinition = {
+            "type": "object",
+            "properties": {
+                "query_result": {"type": "object"},
+                "chart_type": {"type": "string", "enum": ["bar", "line", "pie", "table"]},
+                "intent": {"type": "string"},
+                "field_mapping": {"type": "object"},
+                "max_points": {"type": "integer", "minimum": 1},
+            },
+            "required": ["query_result"],
+            "additionalProperties": False,
+        }
+
+    def execute(self, args: dict[str, Any], context: ToolExecutionContext | None = None) -> dict[str, Any]:
         query_result = args["query_result"]
         rows = list(query_result.get("rows", []))
         columns = list(query_result.get("columns", []))

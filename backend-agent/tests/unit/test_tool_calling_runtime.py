@@ -7,50 +7,95 @@ from typing import Any
 import pytest
 from pydantic import ValidationError
 
+from agent_backend.capabilities.agent_runtime.execution_control import (
+    AgentSpec,
+    NodeSpec,
+    ToolAuthorizationGate,
+)
 from agent_backend.capabilities.agent_runtime.tool_calling import (
-    DatasetScope,
+    BusinessTool,
+    ToolCallError,
+    ToolCallingRuntime,
     ToolCallRequest,
     ToolCallResult,
-    ToolCallingRuntime,
-    ToolDefinition,
-    ToolErrorCode,
+    ToolExecutionContext,
+    ToolExecutionOptions,
     ToolRegistry,
-    ToolStatus,
+)
+from agent_backend.capabilities.data_analysis.tools.contracts import (
+    DataAnalysisToolExecutionContext,
+    DatasetScope,
+)
+from agent_backend.capabilities.data_analysis.tools.policy import (
+    DataAnalysisToolAccessPolicy,
+    DataAnalysisToolPolicyChecker,
+    GuardrailsHook,
 )
 
 
 class EchoTool:
-    def __init__(self, *, output: dict[str, Any] | None = None, delay: float = 0) -> None:
-        self.output = output or {"ok": True, "row_count": 1, "truncated": False, "rows": [{"secret": "sample"}], "columns": []}
+    def __init__(
+        self, *, output: dict[str, Any] | None = None, delay: float = 0
+    ) -> None:
+        self.input_args = {
+            "type": "object",
+            "properties": {"dataset_id": {"type": "string"}, "sql": {"type": "string"}},
+            "required": ["dataset_id", "sql"],
+            "additionalProperties": False,
+        }
+        self.output = output or {
+            "ok": True,
+            "row_count": 1,
+            "truncated": False,
+            "rows": [{"secret": "sample"}],
+            "columns": [],
+        }
         self.delay = delay
 
-    def definition(self) -> ToolDefinition:
-        return ToolDefinition(
-            name="test.echo_query_executor",
-            version="v1",
-            description="Echo test tool.",
-            input_schema={
-                "type": "object",
-                "properties": {"dataset_id": {"type": "string"}, "sql": {"type": "string"}},
-                "required": ["dataset_id", "sql"],
-                "additionalProperties": False,
-            },
-            output_schema={
-                "type": "object",
-                "properties": {"ok": {"type": "boolean"}, "row_count": {"type": "integer"}, "truncated": {"type": "boolean"}},
-                "required": ["ok", "row_count", "truncated"],
-            },
-            allowed_agents=["data_analysis_agent"],
-            allowed_nodes=["execute_sql"],
-            supported_dataset_types=["mysql"],
-            required_permissions=["dataset:read", "query:execute"],
-            timeout_ms=1000,
-        )
+    name = "test.echo_query_executor"
+    description = "Echo test tool."
 
-    def execute(self, args: dict[str, Any]) -> dict[str, Any]:
+    def execute(
+        self, args: dict[str, Any], context: ToolExecutionContext
+    ) -> dict[str, Any]:
         if self.delay:
             time.sleep(self.delay)
         return self.output
+
+
+def echo_runtime(
+    registry: ToolRegistry, *, guardrails_hook: GuardrailsHook | None = None
+) -> ToolCallingRuntime:
+    policy = DataAnalysisToolAccessPolicy(
+        allowed_agents=["data_analysis_agent"],
+        allowed_nodes=["execute_sql"],
+        supported_dataset_types=["mysql"],
+        required_permissions=["dataset:read", "query:execute"],
+        requires_readonly_sql=True,
+    )
+    checker = DataAnalysisToolPolicyChecker(
+        {("test.echo_query_executor", version): policy for version in ("v1", "v2")},
+        guardrails_hook=guardrails_hook,
+    )
+    spec = AgentSpec(
+        agent_id="data_analysis_agent",
+        entry_node="execute_sql",
+        terminal_nodes={"execute_sql"},
+        node_specs={
+            "execute_sql": NodeSpec(
+                node_id="execute_sql", allowed_tools={"test.echo_query_executor"}
+            )
+        },
+        edge_specs=[],
+    )
+    gate = ToolAuthorizationGate(
+        agent_spec_resolver=lambda name, version: spec,
+        policy_resolver=checker.get_policy,
+        business_check=checker.check,
+    )
+    return ToolCallingRuntime(
+        registry, authorize=gate.check, access_policy_resolver=gate.get_policy
+    )
 
 
 def request(**overrides: Any) -> ToolCallRequest:
@@ -70,102 +115,161 @@ def request(**overrides: Any) -> ToolCallRequest:
             selected_dataset_id="dataset-1",
             allowed_dataset_ids=["dataset-1"],
             dataset_types={"dataset-1": "mysql"},
-            permissions=["dataset:read", "query:execute"],
         ),
         "args": {"dataset_id": "dataset-1", "sql": "SELECT * FROM sales"},
         "timeout_ms": 1000,
+        "goal": "Analyze sales",
+        "purpose": "Execute the readonly query",
+        "permissions": ["dataset:read", "query:execute"],
     }
     payload.update(overrides)
-    return ToolCallRequest(**payload)
+    tool_name = payload.pop("tool_name")
+    args = payload.pop("args")
+    return ToolCallRequest(
+        tool_name=tool_name,
+        args=args,
+        context=DataAnalysisToolExecutionContext(**payload),
+    )
 
 
-def test_result_shape_requires_data_on_success() -> None:
+def test_result_requires_success_data() -> None:
     with pytest.raises(ValidationError):
         ToolCallResult(
             tool_call_id="call-1",
             tool_name="tool",
             tool_version="v1",
-            success=True,
-            status=ToolStatus.SUCCEEDED,
             data=None,
         )
 
 
 def test_registry_gets_tool_by_name_and_version() -> None:
-    registry = ToolRegistry([EchoTool()])
+    tool = EchoTool()
+    registry = ToolRegistry([tool])
 
-    assert registry.get("test.echo_query_executor", "v1").definition().name == "test.echo_query_executor"
+    assert registry.get("test.echo_query_executor", "v1") is tool
+    assert registry.list() == [tool]
 
 
-def test_runtime_success_records_started_and_finished_events() -> None:
-    runtime = ToolCallingRuntime(ToolRegistry([EchoTool()]))
+def test_runtime_returns_business_data_and_call_identity() -> None:
+    tool = EchoTool()
+    runtime = echo_runtime(ToolRegistry([tool]))
 
     result = asyncio.run(runtime.call(request()))
 
-    assert result.success
-    assert result.status == ToolStatus.SUCCEEDED
-    assert [event["event_type"] for event in runtime.logger.events] == ["tool_call_started", "tool_call_finished"]
-    assert runtime.logger.events[-1]["row_count"] == 1
-    assert runtime.logger.events[-1]["output_summary"]["sample_rows"] == [{"secret": "sample"}]
+    assert result.model_dump() == {
+        "tool_call_id": "call-1",
+        "tool_name": "test.echo_query_executor",
+        "tool_version": "v1",
+        "data": tool.output,
+    }
 
 
-def test_runtime_returns_validation_failed_for_missing_tool() -> None:
-    runtime = ToolCallingRuntime(ToolRegistry())
+def test_runtime_exposes_registered_business_tool_instances() -> None:
+    tool = EchoTool()
+    runtime = echo_runtime(ToolRegistry([tool]))
 
-    result = asyncio.run(runtime.call(request(tool_name="missing.tool")))
+    assert runtime.get_tool("test.echo_query_executor", "v1") is tool
+    assert runtime.list_tools("data_analysis_agent") == [tool]
+    assert runtime.list_tools("other_agent") == []
 
-    assert not result.success
-    assert result.status == ToolStatus.VALIDATION_FAILED
-    assert result.error is not None
-    assert result.error.code == ToolErrorCode.TOOL_NOT_FOUND
-    assert runtime.logger.events[0]["event_type"] == "tool_call_started"
+
+@pytest.mark.parametrize(
+    ("tool_name", "version", "expected_reason"),
+    [
+        ("missing.tool", "v1", "Tool not found"),
+        ("test.echo_query_executor", "v2", "Tool version not found"),
+    ],
+)
+def test_runtime_raises_for_registry_lookup_errors(
+    tool_name: str,
+    version: str,
+    expected_reason: str,
+) -> None:
+    runtime = echo_runtime(ToolRegistry([EchoTool()]))
+
+    with pytest.raises(ToolCallError) as caught:
+        asyncio.run(runtime.call(request(tool_name=tool_name, tool_version=version)))
+
+    assert caught.value.reason == expected_reason
+    assert not caught.value.retryable
+
+
+def test_runtime_executes_the_requested_tool_version() -> None:
+    first = EchoTool(output={"ok": True, "row_count": 1, "truncated": False})
+    second = EchoTool(output={"ok": True, "row_count": 2, "truncated": False})
+    registry = ToolRegistry([first])
+    registry.register(second, options=ToolExecutionOptions(version="v2"))
+    runtime = echo_runtime(registry)
+
+    first_result = asyncio.run(runtime.call(request(tool_version="v1")))
+    second_result = asyncio.run(runtime.call(request(tool_version="v2")))
+
+    assert first_result.data["row_count"] == 1
+    assert first_result.tool_version == "v1"
+    assert second_result.data["row_count"] == 2
+    assert second_result.tool_version == "v2"
+
+
+def test_runtime_executes_the_business_object_resolved_before_validation() -> None:
+    original = EchoTool(output={"ok": True, "row_count": 1, "truncated": False})
+    replacement = EchoTool(output={"ok": True, "row_count": 2, "truncated": False})
+    registry = ToolRegistry([original])
+
+    def replace_registration(
+        tool: BusinessTool, args: dict[str, Any], context: ToolExecutionContext
+    ) -> bool:
+        registry.register(replacement)
+        return True
+
+    runtime = echo_runtime(registry, guardrails_hook=replace_registration)
+
+    result = asyncio.run(runtime.call(request()))
+
+    assert result.data["row_count"] == 1
 
 
 def test_runtime_rejects_agent_permission() -> None:
-    runtime = ToolCallingRuntime(ToolRegistry([EchoTool()]))
+    runtime = echo_runtime(ToolRegistry([EchoTool()]))
 
-    result = asyncio.run(runtime.call(request(agent_name="other_agent")))
+    with pytest.raises(ToolCallError) as caught:
+        asyncio.run(runtime.call(request(agent_name="other_agent")))
 
-    assert not result.success
-    assert result.status == ToolStatus.PERMISSION_DENIED
-    assert result.error is not None
-    assert result.error.code == ToolErrorCode.TOOL_AGENT_NOT_ALLOWED
+    assert caught.value.reason == "Agent not allowed"
 
 
 def test_runtime_rejects_dataset_scope() -> None:
-    runtime = ToolCallingRuntime(ToolRegistry([EchoTool()]))
+    runtime = echo_runtime(ToolRegistry([EchoTool()]))
     scope = DatasetScope(
         selected_dataset_id="dataset-1",
         allowed_dataset_ids=["dataset-2"],
         dataset_types={"dataset-1": "mysql"},
-        permissions=["dataset:read", "query:execute"],
     )
 
-    result = asyncio.run(runtime.call(request(dataset_scope=scope)))
+    with pytest.raises(ToolCallError) as caught:
+        asyncio.run(runtime.call(request(dataset_scope=scope)))
 
-    assert not result.success
-    assert result.error is not None
-    assert result.error.code == ToolErrorCode.TOOL_DATASET_NOT_ALLOWED
+    assert caught.value.reason == "Dataset not allowed"
 
 
 def test_runtime_rejects_guardrail_failure() -> None:
-    runtime = ToolCallingRuntime(ToolRegistry([EchoTool()]))
+    runtime = echo_runtime(ToolRegistry([EchoTool()]))
 
-    result = asyncio.run(runtime.call(request(args={"dataset_id": "dataset-1", "sql": "DELETE FROM sales"})))
+    with pytest.raises(ToolCallError) as caught:
+        asyncio.run(
+            runtime.call(
+                request(args={"dataset_id": "dataset-1", "sql": "DELETE FROM sales"})
+            )
+        )
 
-    assert not result.success
-    assert result.status == ToolStatus.GUARDRAIL_REJECTED
-    assert result.error is not None
-    assert result.error.code == ToolErrorCode.GUARDRAIL_REJECTED
-    assert not result.error.retryable
+    assert caught.value.reason == "SQL guardrail rejected"
+    assert not caught.value.retryable
 
 
 def test_runtime_times_out_slow_tool() -> None:
-    runtime = ToolCallingRuntime(ToolRegistry([EchoTool(delay=0.05)]))
+    runtime = echo_runtime(ToolRegistry([EchoTool(delay=0.05)]))
 
-    result = asyncio.run(runtime.call(request(timeout_ms=1)))
+    with pytest.raises(ToolCallError) as caught:
+        asyncio.run(runtime.call(request(timeout_ms=1)))
 
-    assert not result.success
-    assert result.status == ToolStatus.TIMEOUT
-    assert result.error is not None
-    assert result.error.retryable
+    assert caught.value.reason == "Tool execution timed out"
+    assert caught.value.retryable

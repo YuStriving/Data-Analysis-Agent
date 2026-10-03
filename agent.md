@@ -397,6 +397,32 @@ Avoid:
 - coupling frontend directly to Python internals
 - injecting module service implementation classes directly when a stable service interface should exist
 
+### 14.1 Generic Abstractions and Business Injection
+
+- prefer generic contracts and reusable execution mechanisms when designing
+  or extending modules; integrate business behavior through explicit dependency
+  injection
+- generic modules own contracts, registration, dispatch, and shared execution;
+  business modules own domain rules, algorithms, data handling, and concrete
+  resource adapters
+- dependencies point from business implementations and assembly code to generic
+  contracts; generic modules must not import or instantiate concrete business
+  implementations or branch on business names and domain-specific payload fields
+- wire implementations, handlers, and business policies in factories, configuration,
+  application entrypoints, or graph builders rather than inside generic executors
+- extend a business capability by adding an implementation and registering or
+  injecting it; change generic execution only when the shared behavior itself changes
+- use the smallest explicit typed contract that supports the actual variation;
+  callable injection is valid, and inheritance or extra interface layers are not
+  mandatory
+- do not hide business coupling in arbitrary metadata dictionaries or introduce
+  speculative abstractions before their responsibilities and consumers are known
+- validate replaceability using different business implementations behind the same
+  generic execution path and preserve input, output, and error contracts
+- before refactoring, identify generic responsibilities, business responsibilities,
+  assembly points, affected callers, and the migration strategy; wire equivalent
+  permission and safety checks before removing the old execution path
+
 ## 15. Git and GitHub Workflow Rules
 
 This repository follows a controlled Git and GitHub workflow.

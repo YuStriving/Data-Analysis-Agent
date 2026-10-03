@@ -1,14 +1,18 @@
 from __future__ import annotations
 
 import time
+from collections.abc import Callable
 from pathlib import Path
-from typing import Any, Callable
+from typing import Any
 from uuid import uuid4
 
 import pandas as pd
 from pydantic import BaseModel, Field
 
-from agent_backend.capabilities.agent_runtime.tool_calling.contracts import ToolDefinition
+from agent_backend.capabilities.agent_runtime.tool_calling.contracts import (
+    InputArgsDefinition,
+    ToolExecutionContext,
+)
 
 FileResolver = Callable[[str], str | Path]
 
@@ -38,21 +42,6 @@ class InMemoryRelationStore:
 DEFAULT_RELATION_STORE = InMemoryRelationStore()
 
 
-def _query_result_schema() -> dict[str, Any]:
-    return {
-        "type": "object",
-        "properties": {
-            "normalized_relation_id": {"type": "string"},
-            "columns": {"type": "array"},
-            "rows": {"type": "array"},
-            "row_count": {"type": "integer"},
-            "truncated": {"type": "boolean"},
-            "execution_time_ms": {"type": "integer"},
-        },
-        "required": ["normalized_relation_id", "columns", "rows", "row_count", "truncated", "execution_time_ms"],
-    }
-
-
 class FileRelationNormalizerTool:
     def __init__(
         self,
@@ -60,49 +49,27 @@ class FileRelationNormalizerTool:
         file_resolver: FileResolver | None = None,
         store: InMemoryRelationStore | None = None,
     ) -> None:
+        self.input_args: InputArgsDefinition = {
+            "type": "object",
+            "properties": {
+                "dataset_id": {"type": "string"},
+                "dataset_type": {"type": "string", "enum": ["csv", "xls", "xlsx"]},
+                "file_ref": {"type": "string"},
+                "sheet_names": {"type": "array", "items": {"type": "string"}},
+                "header_row": {"type": "integer", "minimum": 1},
+                "sample_rows": {"type": "integer", "minimum": 0},
+                "max_rows_to_inspect": {"type": "integer", "minimum": 1},
+            },
+            "required": ["dataset_id", "dataset_type", "file_ref"],
+            "additionalProperties": False,
+        }
         self._file_resolver = file_resolver or Path
         self._store = store or DEFAULT_RELATION_STORE
 
-    def definition(self) -> ToolDefinition:
-        return ToolDefinition(
-            name="file.relation_normalizer",
-            version="v1",
-            description="Normalize CSV, XLS, or XLSX datasets into SQL-safe relations.",
-            input_schema={
-                "type": "object",
-                "properties": {
-                    "dataset_id": {"type": "string"},
-                    "dataset_type": {"type": "string", "enum": ["csv", "xls", "xlsx"]},
-                    "file_ref": {"type": "string"},
-                    "sheet_names": {"type": "array", "items": {"type": "string"}},
-                    "header_row": {"type": "integer", "minimum": 1},
-                    "sample_rows": {"type": "integer", "minimum": 0},
-                    "max_rows_to_inspect": {"type": "integer", "minimum": 1},
-                },
-                "required": ["dataset_id", "dataset_type", "file_ref"],
-                "additionalProperties": False,
-            },
-            output_schema={
-                "type": "object",
-                "properties": {
-                    "dataset_id": {"type": "string"},
-                    "dataset_type": {"type": "string"},
-                    "normalized_relation_id": {"type": "string"},
-                    "relations": {"type": "array"},
-                    "warnings": {"type": "array"},
-                },
-                "required": ["dataset_id", "dataset_type", "normalized_relation_id", "relations", "warnings"],
-            },
-            allowed_agents=["data_analysis_agent"],
-            allowed_nodes=["load_schema", "build_context"],
-            supported_dataset_types=["csv", "xls", "xlsx"],
-            required_permissions=["dataset:read"],
-            timeout_ms=10000,
-            tags=["file", "relation", "schema"],
-            risk_level="low",
-        )
+    name = "file.relation_normalizer"
+    description = "Normalize CSV, XLS, or XLSX datasets into SQL-safe relations."
 
-    def execute(self, args: dict[str, Any]) -> dict[str, Any]:
+    def execute(self, args: dict[str, Any], context: ToolExecutionContext | None = None) -> dict[str, Any]:
         dataset_id = args["dataset_id"]
         dataset_type = args["dataset_type"]
         path = Path(self._file_resolver(args["file_ref"]))
@@ -190,36 +157,24 @@ class FileRelationNormalizerTool:
 
 class RelationQueryExecutorTool:
     def __init__(self, *, store: InMemoryRelationStore | None = None) -> None:
+        self.input_args: InputArgsDefinition = {
+            "type": "object",
+            "properties": {
+                "dataset_id": {"type": "string"},
+                "normalized_relation_id": {"type": "string"},
+                "sql": {"type": "string"},
+                "max_rows": {"type": "integer", "minimum": 1},
+                "relation_names": {"type": "array", "items": {"type": "string"}},
+            },
+            "required": ["dataset_id", "normalized_relation_id", "sql", "max_rows"],
+            "additionalProperties": False,
+        }
         self._store = store or DEFAULT_RELATION_STORE
 
-    def definition(self) -> ToolDefinition:
-        return ToolDefinition(
-            name="relation.query_executor",
-            version="v1",
-            description="Execute readonly SQL against normalized file relations using DuckDB.",
-            input_schema={
-                "type": "object",
-                "properties": {
-                    "dataset_id": {"type": "string"},
-                    "normalized_relation_id": {"type": "string"},
-                    "sql": {"type": "string"},
-                    "max_rows": {"type": "integer", "minimum": 1},
-                    "relation_names": {"type": "array", "items": {"type": "string"}},
-                },
-                "required": ["dataset_id", "normalized_relation_id", "sql", "max_rows"],
-                "additionalProperties": False,
-            },
-            output_schema=_query_result_schema(),
-            allowed_agents=["data_analysis_agent"],
-            allowed_nodes=["execute_sql"],
-            supported_dataset_types=["csv", "xls", "xlsx"],
-            required_permissions=["dataset:read", "query:execute"],
-            timeout_ms=10000,
-            tags=["relation", "query", "duckdb", "readonly"],
-            risk_level="medium",
-        )
+    name = "relation.query_executor"
+    description = "Execute readonly SQL against normalized file relations using DuckDB."
 
-    def execute(self, args: dict[str, Any]) -> dict[str, Any]:
+    def execute(self, args: dict[str, Any], context: ToolExecutionContext | None = None) -> dict[str, Any]:
         import duckdb
 
         started = time.perf_counter()

@@ -1,73 +1,41 @@
 from __future__ import annotations
 
 import time
-from typing import Any, Callable
+from collections.abc import Callable
+from typing import Any
 
 from sqlalchemy import inspect, text
 from sqlalchemy.engine import Engine
 
-from agent_backend.capabilities.agent_runtime.tool_calling.contracts import ToolDefinition
+from agent_backend.capabilities.agent_runtime.tool_calling.contracts import (
+    InputArgsDefinition,
+    ToolExecutionContext,
+)
 
 EngineResolver = Callable[[str], Engine]
 
 
-def _query_result_schema() -> dict[str, Any]:
-    return {
-        "type": "object",
-        "properties": {
-            "dataset_id": {"type": "string"},
-            "dataset_type": {"type": "string"},
-            "columns": {"type": "array"},
-            "rows": {"type": "array"},
-            "row_count": {"type": "integer"},
-            "truncated": {"type": "boolean"},
-            "execution_time_ms": {"type": "integer"},
-        },
-        "required": ["dataset_id", "dataset_type", "columns", "rows", "row_count", "truncated", "execution_time_ms"],
-    }
-
-
 class MySQLSchemaReaderTool:
     def __init__(self, engine_resolver: EngineResolver) -> None:
+        self.input_args: InputArgsDefinition = {
+            "type": "object",
+            "properties": {
+                "dataset_id": {"type": "string"},
+                "table_names": {"type": "array", "items": {"type": "string"}},
+                "include_sample_values": {"type": "boolean"},
+                "max_tables": {"type": "integer", "minimum": 1},
+                "max_columns_per_table": {"type": "integer", "minimum": 1},
+                "sample_rows": {"type": "integer", "minimum": 0},
+            },
+            "required": ["dataset_id"],
+            "additionalProperties": False,
+        }
         self._engine_resolver = engine_resolver
 
-    def definition(self) -> ToolDefinition:
-        return ToolDefinition(
-            name="mysql.schema_reader",
-            version="v1",
-            description="Read authorized MySQL schema and return RelationSchema shaped metadata.",
-            input_schema={
-                "type": "object",
-                "properties": {
-                    "dataset_id": {"type": "string"},
-                    "table_names": {"type": "array", "items": {"type": "string"}},
-                    "include_sample_values": {"type": "boolean"},
-                    "max_tables": {"type": "integer", "minimum": 1},
-                    "max_columns_per_table": {"type": "integer", "minimum": 1},
-                    "sample_rows": {"type": "integer", "minimum": 0},
-                },
-                "required": ["dataset_id"],
-                "additionalProperties": False,
-            },
-            output_schema={
-                "type": "object",
-                "properties": {
-                    "dataset_id": {"type": "string"},
-                    "dataset_type": {"type": "string"},
-                    "relations": {"type": "array"},
-                },
-                "required": ["dataset_id", "dataset_type", "relations"],
-            },
-            allowed_agents=["data_analysis_agent"],
-            allowed_nodes=["load_schema", "build_context"],
-            supported_dataset_types=["mysql"],
-            required_permissions=["dataset:read"],
-            timeout_ms=10000,
-            tags=["mysql", "schema"],
-            risk_level="low",
-        )
+    name = "mysql.schema_reader"
+    description = "Read authorized MySQL schema and return RelationSchema shaped metadata."
 
-    def execute(self, args: dict[str, Any]) -> dict[str, Any]:
+    def execute(self, args: dict[str, Any], context: ToolExecutionContext | None = None) -> dict[str, Any]:
         dataset_id = args["dataset_id"]
         engine = self._engine_resolver(dataset_id)
         inspector = inspect(engine)
@@ -113,7 +81,7 @@ class MySQLSchemaReaderTool:
     def _safe_table_comment(self, inspector: Any, table_name: str) -> str | None:
         try:
             return inspector.get_table_comment(table_name).get("text")
-        except Exception:
+        except Exception:  # noqa: BLE001 -- comments are optional across datasource dialects.
             return None
 
     def _read_sample_values(
@@ -142,35 +110,23 @@ class MySQLSchemaReaderTool:
 
 class MySQLQueryExecutorTool:
     def __init__(self, engine_resolver: EngineResolver) -> None:
+        self.input_args: InputArgsDefinition = {
+            "type": "object",
+            "properties": {
+                "dataset_id": {"type": "string"},
+                "sql": {"type": "string"},
+                "max_rows": {"type": "integer", "minimum": 1},
+                "relation_names": {"type": "array", "items": {"type": "string"}},
+            },
+            "required": ["dataset_id", "sql", "max_rows"],
+            "additionalProperties": False,
+        }
         self._engine_resolver = engine_resolver
 
-    def definition(self) -> ToolDefinition:
-        return ToolDefinition(
-            name="mysql.query_executor",
-            version="v1",
-            description="Execute readonly SQL on an authorized MySQL dataset and return QueryResult.",
-            input_schema={
-                "type": "object",
-                "properties": {
-                    "dataset_id": {"type": "string"},
-                    "sql": {"type": "string"},
-                    "max_rows": {"type": "integer", "minimum": 1},
-                    "relation_names": {"type": "array", "items": {"type": "string"}},
-                },
-                "required": ["dataset_id", "sql", "max_rows"],
-                "additionalProperties": False,
-            },
-            output_schema=_query_result_schema(),
-            allowed_agents=["data_analysis_agent"],
-            allowed_nodes=["execute_sql"],
-            supported_dataset_types=["mysql"],
-            required_permissions=["dataset:read", "query:execute"],
-            timeout_ms=10000,
-            tags=["mysql", "query", "readonly"],
-            risk_level="medium",
-        )
+    name = "mysql.query_executor"
+    description = "Execute readonly SQL on an authorized MySQL dataset and return QueryResult."
 
-    def execute(self, args: dict[str, Any]) -> dict[str, Any]:
+    def execute(self, args: dict[str, Any], context: ToolExecutionContext | None = None) -> dict[str, Any]:
         started = time.perf_counter()
         dataset_id = args["dataset_id"]
         max_rows = int(args["max_rows"])
@@ -179,7 +135,7 @@ class MySQLQueryExecutorTool:
             result = connection.execute(text(args["sql"]))
             fetched = result.mappings().fetchmany(max_rows + 1)
             rows = [dict(row) for row in fetched[:max_rows]]
-            columns = [{"name": key, "type": "unknown", "display_name": key} for key in result.keys()]
+            columns = [{"name": key, "type": "unknown", "display_name": key} for key in result.keys()]  # noqa: SIM118 -- CursorResult is not a dict.
         return {
             "dataset_id": dataset_id,
             "dataset_type": "mysql",
