@@ -135,8 +135,10 @@ to_payload() 保留 reason、message、retryable、detail。已有异常原样�
 同步工具在线程运行，异步或返回 awaitable 的工具被等待。上下文超时优先，否则采用
 执行配置超时；同步线程超时只停止等待，不能保证底层线程已终止。
 
-正式需求与设计集中在 [spec](../../../../spec/tool-calling/spec.md)；
-详细测试方案及验证记录在 [tests](../../../../tests/tool-calling.md)。
+正式行为契约见 [spec](../../../../docs/spec/tool-calling/spec.md)，通用调用与跨模块授权方案见
+[工具执行与授权设计](../../../../docs/design-docs/cross-module/tool-execution-authorization.md)；
+可执行授权与执行器测试见 [Gate tests](../../../tests/unit/test_tool_authorization_gate.py) 和
+[executor tests](../../../tests/unit/test_tool_executor.py)；单次结果记入 Plan。
 
 ## 4. 当前工具清单
 

@@ -18,7 +18,6 @@ frontend-web/.playwright-cli/
 
 # Local agent assets
 .agents/
-frontend-web/AGENTS.md
 frontend-web/CLAUDE.md
 
 # Java

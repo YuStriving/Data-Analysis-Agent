@@ -240,6 +240,5 @@ tests/unit/test_memory_service.py
 设计文档：
 
 ```text
-docs/packages/memory/design.md
-docs/packages/memory/architecture.md
+docs/design-docs/agent-runtime/memory-design.md
 ```

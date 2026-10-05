@@ -2,7 +2,7 @@
 
 This package owns the data-analysis agent graph shape.
 
-The first version uses eight MVP nodes:
+The current graph has eight success-path nodes and a shared failure exit:
 
 1. `load_task_context`
 2. `build_context`
@@ -12,6 +12,7 @@ The first version uses eight MVP nodes:
 6. `interpret_result`
 7. `build_chart`
 8. `persist_result`
+9. `fail_task` (failure exit)
 
 The orchestration layer should schedule these nodes. The generic
 `agent_runtime` package should remain a capability provider for context,

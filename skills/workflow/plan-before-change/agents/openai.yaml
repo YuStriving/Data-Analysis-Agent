@@ -1,0 +1,6 @@
+interface:
+  display_name: "修改前保存计划"
+  short_description: "仓库修改前保存分类计划，小事项使用简版，并持续记录进展、验证和归档"
+  default_prompt: "使用 $plan-before-change 为当前仓库修改创建或更新分类计划，先保存再实施，并记录验证结果。"
+policy:
+  allow_implicit_invocation: true

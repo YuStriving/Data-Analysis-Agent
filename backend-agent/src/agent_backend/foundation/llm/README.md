@@ -486,26 +486,26 @@ YAML config
   -> FakeLlmClient / OpenAICompatibleLlmClient
 ```
 
-当前业务运行链路仍主要依赖显式注入：
+当前图构建入口要求显式注入 `LlmClient`；Kafka 脚手架从环境构建 registry 并将默认 client 注入图：
 
 ```text
-RuntimeTurnRunner / data_analysis node
+api/kafka/worker.py
+  -> build_llm_client_registry_from_env()
+  -> build_data_analysis_graph(model_client=registry.get_default())
+  -> generate_sql node
   -> execute_json_llm_step
   -> LlmClient.complete
 ```
 
-下一步推荐改造为：
-
-```text
-应用启动 / graph 构建
-  -> build_llm_client_registry_from_env()
-  -> 根据默认 client_id 或 node 策略获取 LlmClient
-  -> 注入 RuntimeTurnRunner / data_analysis node
-```
+该 Kafka 文件目前只构建并打印 graph，没有消费任务；HTTP `/internal/tasks` 也不调用 graph。
+因此依赖注入边界已存在，但尚无实际任务入口驱动这条链路。
 
 node 不应该直接依赖 `OpenAICompatibleLlmClient`，只应该依赖统一的 `LlmClient`。
 
-## 12. 当前测试覆盖
+## 12. 测试覆盖定义
+
+用例由模块测试直接维护，见[LLM 基础测试](../../../../tests/unit/test_llm_foundation.py)；本次运行结果记入 Plan 或交付说明。
+下列路径表示测试覆盖定义，不表示当前工作区测试已通过。
 
 已覆盖的测试文件：
 
@@ -544,40 +544,11 @@ python -m ruff check src/agent_backend/foundation/llm tests/unit/test_llm_settin
 python -m pytest tests/unit
 ```
 
-当前验证结果：
+## 13. 当前缺口与后续验证
 
-```text
-All checks passed!
-124 passed, 1 skipped
-```
-
-## 13. 后续实现规划
-
-### 13.1 下一步：生产 graph 注入
-
-建议改造：
-
-```text
-orchestration/data_analysis/graph.py
-orchestration/graph.py
-api/kafka/worker.py
-```
-
-目标：
-
-```text
-1. 应用启动时构建 LlmClientRegistry。
-2. Agent Runtime 或 graph 根据配置选择 client_id。
-3. 把 LlmClient 注入 generate_sql。
-4. SQL 生成节点真正调用配置指定的模型。
-```
-
-MVP 策略：
-
-```text
-所有 LLM node 先使用 default_client。
-node 级 client_id 策略后续再加。
-```
+图构建及 `generate_sql` 的 client 注入已实现；应用级任务消费、Kafka 消费循环、真实图执行
+和真实供应商 API 联调尚未完成。应在任务入口接通后验证配置加载、模型调用、错误映射与输出，
+真实 API 调用不进入默认单元测试，也不得把密钥写入文档或日志。
 
 ### 13.2 再下一步：真实 API 手动集成验证
 

@@ -2,20 +2,30 @@
 
 This repository contains a dual-backend data analysis agent platform:
 
-- `frontend-web`: Next.js UI for dataset upload, task streaming, SQL review, and chart rendering
+- `frontend-web`: Vue 3 / Vite UI for dataset upload, task views, and chart rendering
 - `backend-java`: single Spring Boot monolith with isolated module packages for auth, dataset, job, audit, and gateway concerns
 - `backend-agent`: FastAPI and LangGraph runtime for agent execution, tools, memory, MCP, and guardrails
 - `infra`: local infrastructure bootstrap files
-- `docs`: architecture and runtime contract documents
+- `docs`: architecture, human/AI workflow, specifications, plans, and verification records
+- module docs: local implementation details and runtime contracts
 
-## Initial layout
+## Project and module guidance
 
-- [agent.md](C:\Users\17924\Desktop\agent项目\agent.md)
-- [data-analysis-agent-architecture.md](C:\Users\17924\Desktop\agent项目\docs\data-analysis-agent-architecture.md)
+- [Repository agent guidance](AGENTS.md)
+- [Documentation index](docs/README.md)
+- [Architecture map](docs/architecture/README.md)
+- [Overall design constraints](docs/DESIGN.md)
+- [Detailed design index](docs/design-docs/index.md)
+- [Human and AI execution workflow](docs/WORKFLOW.md)
+- [Agent backend](backend-agent/README.md)
+- [Java backend](backend-java/README.md)
+- [Frontend](frontend-web/README.md)
+- [Development specifications](docs/spec/README.md)
+- [Task planning workflow](docs/exec-plans/README.md)
+- [Quality Skills](skills/quality/README.md)
 
 ## Development notes
 
 - Java owns authentication, authorization, audit, task entry, and external SSE connections.
 - Python owns agent orchestration and internal execution events.
 - All SQL execution is read-only by policy.
-

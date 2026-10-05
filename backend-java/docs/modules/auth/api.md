@@ -1,12 +1,16 @@
 # Java Auth 模块 API 文档
 
+当前认证接口由 `AuthController` 实现。refresh token 仅写入服务端配置的 Cookie；
+响应 JSON 的 `refreshToken` 字段为 `null`，前端只保存 access token。Cookie 的
+HttpOnly、Secure、SameSite、Path 和有效期由服务端配置控制。
+
 ## 1. 基础信息
 
 1. 基础路径：`/api/auth`
 2. 返回包装：`ApiResponse<T>`
 3. 当前采用双令牌方案：
-   - `accessToken` 返回给前端，由前端本地存储并在后续请求中放入 `Authorization` 请求头
-   - `refreshToken` 返回给前端，同时在后端 Redis 中按用户维度保存
+   - `accessToken` 通过 JSON 返回给前端，前端后续请求使用 `Authorization` 请求头
+   - `refreshToken` 通过 HttpOnly Cookie 写入，不由前端读取或保存；服务端会话状态负责校验
 4. Token 算法：`RS256`
 
 ## 2. 注册
@@ -33,7 +37,7 @@
   "message": "ok",
   "data": {
     "accessToken": "jwt-access-token",
-    "refreshToken": "jwt-refresh-token",
+    "refreshToken": null,
     "accessTokenExpiresIn": 900,
     "refreshTokenExpiresIn": 604800,
     "userId": "1",
@@ -66,13 +70,8 @@
 
 ### `POST /api/auth/refresh`
 
-请求体：
-
-```json
-{
-  "refreshToken": "jwt-refresh-token"
-}
-```
+浏览器携带登录/注册时设置的 refresh token Cookie（前端请求使用 `credentials: include`）；
+请求体不包含 refresh token。成功时返回新的 access token，并轮换 Cookie。
 
 刷新策略说明：
 
@@ -88,13 +87,7 @@
 
 1. `Authorization: Bearer <accessToken>`
 
-请求体：
-
-```json
-{
-  "refreshToken": "jwt-refresh-token"
-}
-```
+请求使用 refresh token Cookie；不在 JSON body 中传递 refresh token。
 
 成功响应：
 
@@ -110,7 +103,7 @@
 
 登出策略说明：
 
-1. 后端删除 Redis 中该用户保存的 refresh token
+1. 后端撤销该用户当前 refresh token
 2. 后端将当前 access token 放入黑名单，直到该 token 自然过期
 3. 前端清理本地保存的 access token 与 refresh token
 

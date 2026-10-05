@@ -6,7 +6,9 @@
 
 ## 2. 当前代码现状
 
-当前仅存在 `GET /api/auth/context-demo` 骨架接口，用于返回 `TaskAccessContext` 示例。MVP 需要在此基础上补齐真实认证鉴权能力。
+当前已实现注册、登录、登出、refresh、当前用户查询和任务 access-context 路由，另有
+`GET /api/auth/context-demo` 演示接口。refresh token 通过 HttpOnly Cookie 传递，
+access token 由响应 JSON 返回。具体字段和 Cookie 行为见 [API 文档](api.md)。
 
 ## 3. 核心职责
 

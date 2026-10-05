@@ -1,74 +1,16 @@
 # Python Worker 接口与事件文档
 
-## 1. 运行入口
+> 当前实现核对：`src/agent_backend/api/kafka/worker.py` 只构造 LLM registry
+> 和数据分析图并打印启动信息。它没有 Kafka consumer、回调 API 或事件发布接口；
+> 本文件只记录当前脚手架，不将历史建议描述为可用契约。
 
-1. 启动命令：`python -m worker.main`
+## 1. 当前行为
 
-## 2. 当前阶段说明
+调用 `main()` 会尝试从环境构造 LLM registry 和数据分析图，然后打印图对象；运行需要
+有效的模型配置。当前没有提供可消费任务的 Worker 命令入口或 Kafka consumer。
 
-初版主链不经过 Worker。
+## 2. 尚未定义的契约
 
-当前推荐主链为：
-
-1. Java -> `agent_api` HTTP 流式请求
-2. `agent_api` -> LangGraph
-3. `agent_api` -> Java NDJSON 事件流
-
-Worker 文档保留给第二阶段 Kafka 化演进。
-
-## 3. 消费主题
-
-### `analysis.task.created`
-
-事件体：
-
-```json
-{
-  "taskId": "task-demo-001",
-  "tenantId": "tenant-demo",
-  "userId": "user-demo",
-  "traceId": "trace-demo-001",
-  "question": "Compare monthly revenue for the last 6 months"
-}
-```
-
-## 4. 内部状态装配
-
-Worker 需要将 Kafka 事件转换为 `AgentState`：
-
-1. `task_id`
-2. `trace_id`
-3. `question`
-4. `dataset_ids`
-
-## 5. 回调 Java 接口
-
-### `POST /internal/agent/tasks/{taskId}/callback`
-
-请求体建议：
-
-```json
-{
-  "traceId": "trace-demo-001",
-  "status": "succeeded",
-  "sqlText": "SELECT ...",
-  "finalAnswer": "最近6个月营收整体上升。",
-  "warnings": [],
-  "chartOption": {},
-  "finishedAt": "2026-08-27T10:00:30Z"
-}
-```
-
-## 6. 中间事件输出
-
-建议产生以下事件类型：
-
-1. `task_started`
-2. `context_built`
-3. `sql_delta`
-4. `sql_ready`
-5. `query_executed`
-6. `answer_delta`
-7. `chart_ready`
-8. `task_finished`
-9. `task_failed`
+当前没有确认的 Kafka topic、消息格式、重试策略、Java 回调或事件输出契约。
+这些能力实施前应按根目录 [Spec 协作约定](../../../../docs/spec/README.md)
+确认需求，再补充对应接口文档。

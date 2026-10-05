@@ -4,12 +4,13 @@
 
 `/register` 是项目的注册入口，负责创建新的登录账号并在成功后回到登录页。
 
-当前前端版本先做基础防刷与格式校验，后续仍需要由 Java 后端做最终校验与落库。
+前端执行基础格式校验，注册请求由 Java `/api/auth/register` 完成最终校验与创建；
+成功后前端保存 access token，并由浏览器管理服务端设置的 refresh token Cookie。
 
 ## 2. 依据
 
 - `infra/mysql/schema/20260827_auth_tables.sql`
-- `frontend-web/agent.md`
+- 根 `AGENTS.md` 与 `frontend-web/README.md`
 - `frontend-web/src/pages/RegisterPage.vue`
 - `frontend-web/src/lib/register-validation.ts`
 
@@ -71,9 +72,9 @@
 ## 6. 提交行为
 
 1. 校验通过后才允许进入提交态
-2. 当前版本点击注册按钮不会请求真实后端
-3. 当前版本调用前端本地 `registerMockAccount`
-4. 注册成功后跳转到 `/login?registered=1&identifier=<username>`
+2. 当前版本调用 `registerWithAuthApi` 向 Java 注册接口提交表单
+3. 成功后保存登录会话并跳转到 `next` 页面，默认 `/`
+4. 服务不可用或注册失败时展示错误，页面不伪造注册成功状态
 
 ## 7. 非目标
 

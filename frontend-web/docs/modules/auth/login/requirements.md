@@ -9,7 +9,7 @@
 ## 2. 依据
 
 - `infra/mysql/schema/20260827_auth_tables.sql`
-- `frontend-web/agent.md`
+- 根 `AGENTS.md` 与 `frontend-web/README.md`
 - `frontend-web/src/pages/LoginPage.vue`
 
 ## 3. 必须包含的元素

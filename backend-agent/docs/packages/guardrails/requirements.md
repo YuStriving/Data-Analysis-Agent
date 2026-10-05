@@ -6,17 +6,11 @@
 
 ## 2. 当前代码现状
 
-当前 `validate_sql(sql)` 通过关键字黑名单过滤：
-
-1. `INSERT`
-2. `UPDATE`
-3. `DELETE`
-4. `DROP`
-5. `ALTER`
-6. `TRUNCATE`
-7. `CREATE`
-
-这只是首层保护，MVP 仍需补足访问范围、结果规模和多语句校验。
+当前实现 `validate_sql_detailed` 检查空语句、多语句、禁止关键字、只读
+`SELECT`/`WITH`、可识别的关系及字段范围，并对无聚合且无 `LIMIT` 的查询给出
+规模风险警告。实现使用轻量文本处理，不是 AST 级校验；关系/字段识别有语法覆盖限制。
+业务节点传入 Schema 关系及 SQL policy metadata，详见 [接口文档](api.md) 与
+`src/agent_backend/capabilities/agent_runtime/guardrails/sql.py`。
 
 ## 3. 核心职责
 
@@ -28,11 +22,9 @@
 
 ## 4. MVP 功能需求
 
-1. 支持 forbidden token 校验
-2. 支持只允许 `SELECT`
-3. 支持表白名单校验
-4. 支持敏感字段命中告警
-5. 支持超过阈值时挂起或失败
+1. 维护只读 SQL 校验结果及稳定规则码。
+2. 把范围校验结果交由调用节点和数据访问策略共同处理。
+3. 明确记录轻量文本识别的限制，不宣称 AST、敏感字段策略或查询执行配额已在本模块实现。
 
 ## 5. 验收标准
 

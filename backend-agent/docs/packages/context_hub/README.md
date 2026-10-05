@@ -264,6 +264,5 @@ tests/unit/test_context_hub.py
 设计文档：
 
 ```text
-docs/packages/context_hub/design.md
-docs/packages/context_hub/architecture.md
+docs/design-docs/agent-runtime/context-hub-design.md
 ```

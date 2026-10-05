@@ -12,6 +12,22 @@ concurrency:
   cancel-in-progress: true
 
 jobs:
+  docs:
+    name: docs
+    runs-on: ubuntu-latest
+    timeout-minutes: 5
+    steps:
+      - name: Checkout
+        uses: actions/checkout@v4
+      - name: Setup Python
+        uses: actions/setup-python@v5
+        with:
+          python-version: "3.12"
+      - name: Test documentation checker
+        run: python -B -m unittest discover -s scripts/ci -p "test_*.py" -v
+      - name: Check documentation
+        run: python scripts/ci/check-docs.py
+
   frontend-web:
     name: frontend-web
     runs-on: ubuntu-latest

@@ -1,5 +1,10 @@
 # 分析工作台首页接口文档
 
+> 本文记录目标接口与展示契约，不代表工作台已接通后端任务主链。当前
+> `workspace-store.ts` 使用 `mock-data` 并通过定时器模拟事件；它没有请求任务 API 或订阅 SSE。
+> Java 当前路由见 [Job API](../../../../backend-java/docs/modules/job/api.md) 和
+> [Dataset API](../../../../backend-java/docs/modules/dataset/api.md)。
+
 ## 1. 文档目的
 
 本文档定义首页工作台依赖的前后端接口契约，覆盖页面初始化、数据集查询、任务创建、任务详情查询、SSE 订阅和结果结构。

@@ -1,5 +1,8 @@
 # Java Gateway 模块 API 文档
 
+当前仅实现 `GET /api/gateway/health`。工作台初始化接口及任务接口为未实现的旧目标，
+不能作为当前服务契约。
+
 ## 1. 模块基础信息
 
 1. 基础路径：`/api/gateway`
@@ -19,35 +22,7 @@
 }
 ```
 
-## 3. 工作台初始化数据
+## 3. 当前路由
 
-### `GET /api/gateway/workbench/bootstrap`
-
-响应体建议：
-
-```json
-{
-  "success": true,
-  "message": "ok",
-  "data": {
-    "user": {
-      "userId": "user-001",
-      "roles": ["ANALYST"]
-    },
-    "datasets": [
-      {"datasetId": "dataset-sales", "datasetName": "sales"}
-    ],
-    "recentTasks": []
-  }
-}
-```
-
-## 4. 说明
-
-初版不在 `gateway` 模块暴露任务 SSE。
-
-任务相关接口统一由 `job` 模块提供：
-
-1. `POST /api/tasks`
-2. `GET /api/tasks/{id}`
-3. `GET /api/tasks/{id}/stream`
+`GET /api/gateway/health` 返回 `ApiResponse<String>`，数据为 `backend-java-monolith`。
+当前没有 bootstrap 或任务路由；任务能力状态见 [Job API](../job/api.md)。

@@ -101,3 +101,7 @@ storage:
     access-key-id: ${config.storage.oss.access-key-id}
     access-key-secret: ${config.storage.oss.access-key-secret}
     public-domain: ${config.storage.oss.public-domain}
+    upload-prefixes:
+      csv: ${config.storage.oss.upload-prefixes.csv:datasets/csv}
+      xlsx: ${config.storage.oss.upload-prefixes.xlsx:datasets/xlsx}
+      xls: ${config.storage.oss.upload-prefixes.xls:datasets/xls}
