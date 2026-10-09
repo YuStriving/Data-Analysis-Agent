@@ -115,10 +115,10 @@ jobs:
       - name: Lint
         run: >
           ruff check
-          src/agent_backend/foundation/llm
-          src/agent_backend/capabilities/data_analysis/tools/__init__.py
-          src/agent_backend/capabilities/data_analysis/tools/runtime.py
-          src/agent_backend/orchestration/data_analysis/graph.py
+          agent_backend/foundation/llm
+          agent_backend/capabilities/data_analysis/tools/__init__.py
+          agent_backend/capabilities/data_analysis/tools/runtime.py
+          agent_backend/orchestration/data_analysis/graph.py
           tests/unit/test_llm_settings.py
           tests/unit/test_openai_compatible_llm_adapter.py
           tests/unit/test_data_analysis_graph.py

@@ -44,10 +44,9 @@
 
 ## 当前分支与未提交改动
 
-- 分支：`codex/foundation-llm-client`；当前提交：`b517346 chore: align project docs and implementation`。
+- 盘点开始时分支为 `codex/foundation-llm-client`，HEAD 为 `b517346 chore: align project docs and implementation`。
 - 本盘点开始时，Git 工作区有 365 项状态记录：27 项修改、199 项删除、139 项未跟踪。改动集中在 `backend-agent` 和文档；这些改动未提交，且本次没有验证其完整性。
-- Python 包呈现整体路径迁移：旧的 `backend-agent/src/agent_backend/` 有 135 个删除项，新的 `backend-agent/agent_backend/` 有 136 个未跟踪文件；`pyproject.toml` 已切到根目录包布局。这更像目录迁移，而不能单凭 Git 统计认定功能代码被删掉。
-- 迁移还没有形成可信的验证基线：[CI 工作流](../.github/workflows/ci.yml) 的 Ruff 检查仍指向旧的 `src/agent_backend/` 路径。当前没有运行 CI、Ruff 或 Python 测试来确认迁移结果。
+- Python 包已从 `backend-agent/src/agent_backend/` 迁移到 `backend-agent/agent_backend/` 根目录布局，`pyproject.toml`、CI Ruff 检查路径和测试导入已同步。迁移后本地全量 Python 测试为 245 passed、1 skipped，Ruff 检查通过；这不替代远端 CI 结果。
 - 工作区另有大量旧文档删除。当前统计不能说明这些删除均已完成审核；保留或重建应依据这次状态盘点和实际需求逐项决定，不应按删除行数推算功能进度。
 
 ## 建议的下一步
