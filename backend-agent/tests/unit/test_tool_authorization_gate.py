@@ -7,13 +7,13 @@ from typing import Any, ClassVar
 import pytest
 from pydantic import ValidationError
 
-from agent_backend.capabilities.agent_runtime.execution_control import (
+from agent_backend.agent_runtime.execution_control import (
     AgentSpec,
     NodeSpec,
     ToolAccessPolicy,
     ToolAuthorizationGate,
 )
-from agent_backend.capabilities.agent_runtime.tool_calling import (
+from agent_backend.agent_runtime.tool_calling import (
     ToolCallError,
     ToolCallingRuntime,
     ToolCallRequest,
@@ -22,7 +22,7 @@ from agent_backend.capabilities.agent_runtime.tool_calling import (
     ToolExecutor,
     ToolRegistry,
 )
-from agent_backend.capabilities.agent_runtime.tool_calling.executor import (
+from agent_backend.agent_runtime.tool_calling.executor import (
     AuthorizationCheck,
 )
 

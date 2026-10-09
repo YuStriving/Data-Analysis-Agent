@@ -22,10 +22,9 @@ class DocumentationChecksTest(unittest.TestCase):
         self.root = Path(temporary.name).resolve()
         subprocess.run(["git", "init", "--quiet", str(self.root)], check=True, capture_output=True)
         for name in (
-            "AGENTS.md", "README.md", "docs/README.md", "docs/architecture/README.md",
-            "docs/DESIGN.md", "docs/design-docs/index.md", "docs/design-docs/core-beliefs.md",
-            "docs/WORKFLOW.md", "docs/spec/README.md", "docs/spec/template.md",
-            "docs/exec-plans/README.md",
+            "AGENTS.md", "README.md", "docs/README.md", "docs/PROJECT-STATUS.md",
+            "docs/adr/0001-mvp-agent-collaboration.md", "docs/agents/issue-tracker.md",
+            "docs/agents/domain.md", "docs/agents/triage-labels.md",
         ):
             self.write(name, "# Entry\n")
         self.write("skills/README.md", "| 分类 | 放置内容 | 当前 Skills |\n| --- | --- | --- |\n"
@@ -79,7 +78,7 @@ class DocumentationChecksTest(unittest.TestCase):
     def test_comment_markers_in_code_examples_do_not_hide_later_navigation(self):
         for example in ("```html\n<!--\n```", "`<!--`", "    <!--"):
             with self.subTest(example=example):
-                self.write("docs/README.md", f"# Docs\n\n{example}\n\n[workflow](WORKFLOW.md)\n")
+                self.write("docs/README.md", f"# Docs\n\n{example}\n\n[status](PROJECT-STATUS.md)\n")
                 self.assertEqual([], self.errors())
 
     def test_hidden_empty_declarations_do_not_contradict_registered_category(self):
@@ -194,7 +193,7 @@ class DocumentationChecksTest(unittest.TestCase):
                             for issue in self.errors()), self.errors())
 
     def test_local_heading_anchors_are_still_checked(self):
-        self.write("docs/README.md", "# Docs\n[valid](WORKFLOW.md#entry)\n[bad](WORKFLOW.md#absent)\n")
+        self.write("docs/README.md", "# Docs\n[valid](PROJECT-STATUS.md#entry)\n[bad](PROJECT-STATUS.md#absent)\n")
         errors = self.errors()
         self.assertEqual(1, len(errors), errors)
         self.assertIn("Missing heading anchor", errors[0])

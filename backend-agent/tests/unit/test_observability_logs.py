@@ -4,8 +4,11 @@ import json
 from datetime import date
 from io import StringIO
 
-from agent_backend.capabilities.agent_runtime.observability.events import EVENT_TYPE_CHECKPOINT, CheckpointEvent
-from agent_backend.capabilities.agent_runtime.observability.logger import (
+from agent_backend.agent_runtime.observability.events import (
+    EVENT_TYPE_CHECKPOINT,
+    CheckpointEvent,
+)
+from agent_backend.agent_runtime.observability.logger import (
     AlertRecord,
     append_daily_alert,
     build_daily_alert_path,

@@ -7,7 +7,7 @@ from typing import Any, NoReturn
 import pytest
 from sqlalchemy import create_engine, text
 
-from agent_backend.capabilities.agent_runtime.tool_calling import (
+from agent_backend.agent_runtime.tool_calling import (
     ToolCallError,
     ToolCallRequest,
     ToolExecutor,

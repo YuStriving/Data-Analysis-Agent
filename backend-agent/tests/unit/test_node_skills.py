@@ -2,7 +2,15 @@ from pathlib import Path
 
 import pytest
 
-from agent_backend.capabilities.agent_runtime.skills import (
+from agent_backend.capabilities.data_analysis.contracts.context import (
+    ContextBundle,
+    ConversationContext,
+    DatasetContext,
+    PreviousTurnContext,
+    RequestContext,
+    SchemaContext,
+)
+from agent_backend.capabilities.data_analysis.skills import (
     MissingSkillContextError,
     NodeSkillFormatError,
     NodeSkillNotFoundError,
@@ -11,14 +19,6 @@ from agent_backend.capabilities.agent_runtime.skills import (
     render_node_skill,
 )
 from agent_backend.foundation.access import AccessContext
-from agent_backend.foundation.contracts.context import (
-    ContextBundle,
-    ConversationContext,
-    DatasetContext,
-    PreviousTurnContext,
-    RequestContext,
-    SchemaContext,
-)
 
 
 def make_generate_sql_bundle() -> ContextBundle:
@@ -56,7 +56,7 @@ def make_generate_sql_bundle() -> ContextBundle:
 
 def test_load_node_skill_parses_front_matter() -> None:
     skill = load_node_skill(
-        Path("src/agent_backend/capabilities/data_analysis/skills/generate_sql/base.v1.md")
+        Path("agent_backend/capabilities/data_analysis/skills/generate_sql/base.v1.md")
     )
 
     assert skill.skill_id == "data_analysis.generate_sql"

@@ -15,14 +15,11 @@ REQUIRED = (
     "AGENTS.md",
     "README.md",
     "docs/README.md",
-    "docs/architecture/README.md",
-    "docs/DESIGN.md",
-    "docs/design-docs/index.md",
-    "docs/design-docs/core-beliefs.md",
-    "docs/WORKFLOW.md",
-    "docs/spec/README.md",
-    "docs/spec/template.md",
-    "docs/exec-plans/README.md",
+    "docs/PROJECT-STATUS.md",
+    "docs/adr/0001-mvp-agent-collaboration.md",
+    "docs/agents/issue-tracker.md",
+    "docs/agents/domain.md",
+    "docs/agents/triage-labels.md",
 )
 LINK = re.compile(r"\[[^\]\n]+\]\((<[^>]+>|[^\s)]+)(?:\s+\"[^\"]*\")?\)")
 FENCE = re.compile(r"^\s{0,3}(`{3,}|~{3,})")

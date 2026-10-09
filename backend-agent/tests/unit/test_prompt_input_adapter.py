@@ -1,6 +1,9 @@
 import pytest
 
-from agent_backend.foundation.contracts.context import (
+from agent_backend.agent_runtime.prompt import (
+    MissingPromptInputSectionsError,
+)
+from agent_backend.capabilities.data_analysis.contracts.context import (
     ContextBundle,
     ConversationContext,
     DatasetContext,
@@ -8,11 +11,10 @@ from agent_backend.foundation.contracts.context import (
     RequestContext,
     SchemaContext,
 )
-from agent_backend.capabilities.agent_runtime.prompt import (
-    MissingPromptInputSectionsError,
+from agent_backend.capabilities.data_analysis.prompting.input_adapter import (
     build_prompt_request,
 )
-from agent_backend.capabilities.agent_runtime.skills import (
+from agent_backend.capabilities.data_analysis.skills import (
     SkillInputAdapter,
     render_node_skill,
 )

@@ -139,5 +139,5 @@ def test_llm_errors_expose_stable_code_and_retryable_flag(
     code: str,
     retryable: bool,
 ) -> None:
-    assert getattr(error, "code") == code
-    assert getattr(error, "retryable") is retryable
+    assert error.code == code
+    assert error.retryable is retryable

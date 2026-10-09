@@ -1,13 +1,12 @@
 from __future__ import annotations
 
 import json
-from datetime import datetime, timezone
+from datetime import UTC, datetime
 
 import pytest
 from pydantic import ValidationError
 
-from agent_backend.capabilities.agent_runtime.memory.service import MemoryService
-from agent_backend.foundation.contracts.memory import (
+from agent_backend.capabilities.data_analysis.contracts.memory import (
     AnswerGeneratedPayload,
     MemoryEvent,
     MemoryScope,
@@ -15,6 +14,7 @@ from agent_backend.foundation.contracts.memory import (
     PendingMemoryItem,
     QuestionReceivedPayload,
 )
+from agent_backend.capabilities.data_analysis.memory.service import MemoryService
 
 
 class FakeRedisStore:
@@ -93,7 +93,7 @@ def make_turn(turn_id: str = "turn-1", role: str = "assistant") -> MemoryTurn:
         trace_id="trace-1",
         role=role,
         content="monthly revenue trend",
-        created_at=datetime(2026, 9, 7, 0, 0, 0, tzinfo=timezone.utc),
+        created_at=datetime(2026, 9, 7, 0, 0, 0, tzinfo=UTC),
     )
 
 
@@ -108,7 +108,7 @@ def make_event(event_id: str = "event-1") -> MemoryEvent:
         event_type="answer_generated",
         event_seq=1,
         payload=AnswerGeneratedPayload(answer="The answer", has_chart=True),
-        created_at=datetime(2026, 9, 7, 0, 0, 1, tzinfo=timezone.utc),
+        created_at=datetime(2026, 9, 7, 0, 0, 1, tzinfo=UTC),
     )
 
 
@@ -151,7 +151,7 @@ def test_record_event_enqueues_pending_and_updates_hot_context() -> None:
             event_type="question_received",
             event_seq=1,
             payload=QuestionReceivedPayload(question="Show revenue", dataset_ids=["dataset-sales"]),
-            created_at=datetime(2026, 9, 7, 0, 0, 0, tzinfo=timezone.utc),
+            created_at=datetime(2026, 9, 7, 0, 0, 0, tzinfo=UTC),
         )
     )
 
@@ -173,7 +173,7 @@ def test_memory_event_requires_event_type_to_match_payload_type() -> None:
             event_type="answer_generated",
             event_seq=1,
             payload=QuestionReceivedPayload(question="Show revenue"),
-            created_at=datetime(2026, 9, 7, 0, 0, 0, tzinfo=timezone.utc),
+            created_at=datetime(2026, 9, 7, 0, 0, 0, tzinfo=UTC),
         )
 
 

@@ -1,4 +1,7 @@
-from agent_backend.capabilities.agent_runtime.guardrails.sql import validate_sql, validate_sql_detailed
+from agent_backend.capabilities.data_analysis.guardrails.sql import (
+    validate_sql,
+    validate_sql_detailed,
+)
 
 
 def test_validate_sql_rejects_write_statement() -> None:

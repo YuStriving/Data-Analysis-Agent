@@ -2,17 +2,17 @@ from __future__ import annotations
 
 import json
 
-from agent_backend.foundation.contracts.context import SchemaContext
-from agent_backend.capabilities.agent_runtime.memory.service import MemoryService
-from agent_backend.foundation.contracts.memory import PendingMemoryItem
-from agent_backend.capabilities.agent_runtime.prompt import PromptBudgetGuard, PromptBudgetPolicy
-from agent_backend.capabilities.agent_runtime.runtime_turn import (
+from agent_backend.agent_runtime.prompt import PromptBudgetGuard, PromptBudgetPolicy
+from agent_backend.capabilities.data_analysis.contracts.context import SchemaContext
+from agent_backend.capabilities.data_analysis.contracts.memory import PendingMemoryItem
+from agent_backend.capabilities.data_analysis.contracts.task import AnalysisTaskRequest
+from agent_backend.capabilities.data_analysis.memory.service import MemoryService
+from agent_backend.capabilities.data_analysis.runtime_turn import (
     InMemoryRuntimeEventSink,
     RuntimeTurnDependencies,
     RuntimeTurnRunner,
 )
 from agent_backend.foundation.access import AccessContext
-from agent_backend.foundation.contracts.task import AnalysisTaskRequest
 from agent_backend.foundation.llm.adapters.fake import FakeLlmClient
 
 

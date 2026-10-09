@@ -1,8 +1,8 @@
 from __future__ import annotations
 
-from agent_backend.capabilities.agent_runtime.execution import LlmRequestAdapter
-from agent_backend.capabilities.agent_runtime.prompt.contracts import PromptRenderResult
-from agent_backend.capabilities.agent_runtime.skills import SkillRenderResult
+from agent_backend.agent_runtime.prompt.contracts import PromptRenderResult
+from agent_backend.capabilities.data_analysis.execution import LlmRequestAdapter
+from agent_backend.capabilities.data_analysis.skills import SkillRenderResult
 
 
 def test_llm_request_adapter_wraps_system_prompt_and_skill_messages() -> None:

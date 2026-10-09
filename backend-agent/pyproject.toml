@@ -37,15 +37,15 @@ dev = [
 package-dir = {"" = "."}
 
 [tool.setuptools.packages.find]
-where = ["src"]
+where = ["."]
+exclude = ["tests", "tests.*"]
 
 [tool.setuptools.package-data]
 "agent_backend.capabilities.data_analysis" = ["prompts/**/*.md", "skills/**/*.md"]
 
 [tool.pytest.ini_options]
-pythonpath = ["src"]
+pythonpath = ["."]
 testpaths = ["tests"]
 
 [tool.ruff.lint.isort]
 known-first-party = ["agent_backend"]
-

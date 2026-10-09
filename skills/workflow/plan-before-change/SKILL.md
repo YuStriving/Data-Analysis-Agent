@@ -5,10 +5,9 @@ description: 为需要 Plan 的 Normal 和 Complex 仓库任务保存或更新�
 
 # Normal/Complex 任务保存计划
 
-适用于本仓库需要 Plan 的协作任务。先定位仓库根目录，遵守唯一的根目录
-`AGENTS.md`；模块入口与局部实现说明见对应 README。读取[协作执行规范](../../../docs/WORKFLOW.md)、
-[计划工作流](../../../docs/exec-plans/README.md) 与[Spec 协作约定](../../../docs/spec/README.md)。
-分类、Plan 状态与模板以工作流文档为准；本 Skill 不替代 Spec 或实施授权。
+适用于本仓库需要 Plan 的协作任务。先定位仓库根目录，遵守唯一的[根 AGENTS.md](../../../AGENTS.md)；
+模块入口与局部实现说明见对应 README，项目文档入口见[docs/README.md](../../../docs/README.md)。
+任务范围、风险、审批和文档边界以根 AGENTS.md 为准；本 Skill 不替代用户确认或实施授权。
 
 ## 工作步骤
 

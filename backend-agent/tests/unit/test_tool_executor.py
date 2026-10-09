@@ -7,8 +7,8 @@ from typing import Any
 import pytest
 from pydantic import BaseModel, RootModel, field_serializer
 
-from agent_backend.capabilities.agent_runtime import tool_calling
-from agent_backend.capabilities.agent_runtime.execution_control import (
+from agent_backend.agent_runtime import tool_calling
+from agent_backend.agent_runtime.execution_control import (
     AgentSpec,
     NodeSpec,
     ToolAccessPolicy,

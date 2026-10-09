@@ -1,7 +1,12 @@
-from agent_backend.capabilities.agent_runtime.context.builder import build_context
-from agent_backend.capabilities.agent_runtime.context.builder import ContextBuilder
-from agent_backend.capabilities.agent_runtime.context.policies import resolve_context_policy
-from agent_backend.foundation.contracts.context import (
+from agent_backend.agent_runtime.checkpoint.contracts import NodeCheckpointSnapshot
+from agent_backend.capabilities.data_analysis.context.builder import (
+    ContextBuilder,
+    build_context,
+)
+from agent_backend.capabilities.data_analysis.context.policies import (
+    resolve_context_policy,
+)
+from agent_backend.capabilities.data_analysis.contracts.context import (
     ContextIdentity,
     ContextSource,
     DatasetContext,
@@ -10,9 +15,8 @@ from agent_backend.foundation.contracts.context import (
     RequestContext,
     SchemaContext,
 )
-from agent_backend.capabilities.agent_runtime.checkpoint.contracts import NodeCheckpointSnapshot
+from agent_backend.capabilities.data_analysis.contracts.task import AnalysisTaskRequest
 from agent_backend.foundation.access import AccessContext
-from agent_backend.foundation.contracts.task import AnalysisTaskRequest
 
 
 def make_access_context() -> AccessContext:

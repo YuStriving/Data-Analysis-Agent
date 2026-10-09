@@ -4,21 +4,21 @@ from typing import Any
 
 import pytest
 
-from agent_backend.capabilities.agent_runtime.prompt import (
+from agent_backend.agent_runtime.prompt import (
     PromptBudgetGuard,
     PromptBudgetPolicy,
 )
-from agent_backend.capabilities.agent_runtime.tool_calling import (
+from agent_backend.agent_runtime.tool_calling import (
     ToolCallingRuntime,
     ToolExecutionContext,
     ToolRegistry,
 )
-from agent_backend.capabilities.agent_runtime.tool_calling.errors import ToolCallError
+from agent_backend.agent_runtime.tool_calling.errors import ToolCallError
+from agent_backend.capabilities.data_analysis.contracts.task import AnalysisTaskRequest
 from agent_backend.capabilities.data_analysis.tools.runtime import (
     build_data_analysis_tool_authorization_gate,
 )
 from agent_backend.foundation.access import AccessContext
-from agent_backend.foundation.contracts.task import AnalysisTaskRequest
 from agent_backend.foundation.llm.adapters.fake import FakeLlmClient
 from agent_backend.orchestration.data_analysis.adapters import request_to_initial_state
 from agent_backend.orchestration.data_analysis.nodes._shared import fail_node

@@ -6,22 +6,24 @@ This repository contains a dual-backend data analysis agent platform:
 - `backend-java`: single Spring Boot monolith with isolated module packages for auth, dataset, job, audit, and gateway concerns
 - `backend-agent`: FastAPI and LangGraph runtime for agent execution, tools, memory, MCP, and guardrails
 - `infra`: local infrastructure bootstrap files
-- `docs`: architecture, human/AI workflow, specifications, plans, and verification records
+- `docs`: current MVP status, architecture decisions, and Agent setup notes
 - module docs: local implementation details and runtime contracts
 
 ## Project and module guidance
 
 - [Repository agent guidance](AGENTS.md)
 - [Documentation index](docs/README.md)
-- [Architecture map](docs/architecture/README.md)
-- [Overall design constraints](docs/DESIGN.md)
-- [Detailed design index](docs/design-docs/index.md)
-- [Human and AI execution workflow](docs/WORKFLOW.md)
+- [MVP project status](docs/PROJECT-STATUS.md)
+- [MVP collaboration decision](docs/adr/0001-mvp-agent-collaboration.md)
+- [GitHub issue tracker setup](docs/agents/issue-tracker.md)
+- [Domain documentation rules](docs/agents/domain.md)
+- [Triage label mapping](docs/agents/triage-labels.md)
 - [Agent backend](backend-agent/README.md)
 - [Java backend](backend-java/README.md)
 - [Frontend](frontend-web/README.md)
-- [Development specifications](docs/spec/README.md)
-- [Task planning workflow](docs/exec-plans/README.md)
+- [Infrastructure](infra/README.md)
+- [Scripts](scripts/README.md)
+- [Repository Skills](skills/README.md)
 - [Quality Skills](skills/quality/README.md)
 
 ## Development notes

@@ -2,20 +2,22 @@ from pathlib import Path
 
 import pytest
 
-from agent_backend.capabilities.agent_runtime.prompt import (
+from agent_backend.agent_runtime.prompt import (
     MissingPromptVariablesError,
     PromptRenderRequest,
-    map_prompt_error_to_user_failure,
     render_prompt,
     render_system_prompt,
 )
-from agent_backend.capabilities.agent_runtime.prompt.exceptions import (
+from agent_backend.agent_runtime.prompt.exceptions import (
     DuplicateActivePromptTemplateError,
-    PromptTemplateNotFoundError,
     PromptTemplateFormatError,
+    PromptTemplateNotFoundError,
 )
-from agent_backend.capabilities.agent_runtime.prompt.loader import load_prompt_template
-from agent_backend.capabilities.agent_runtime.prompt.registry import PromptRegistry
+from agent_backend.agent_runtime.prompt.loader import load_prompt_template
+from agent_backend.agent_runtime.prompt.registry import PromptRegistry
+from agent_backend.capabilities.data_analysis.prompting.failures import (
+    map_prompt_error_to_user_failure,
+)
 
 
 def test_render_system_prompt_loads_active_system_template() -> None:
@@ -57,7 +59,7 @@ def test_prompt_error_maps_to_user_facing_failure() -> None:
 
 
 def test_load_prompt_template_parses_front_matter() -> None:
-    template = load_prompt_template(Path("src/agent_backend/capabilities/data_analysis/prompts/system/base.v1.md"))
+    template = load_prompt_template(Path("agent_backend/capabilities/data_analysis/prompts/system/base.v1.md"))
 
     assert template.agent_id == "data_analysis_agent"
     assert template.node_id == "system"

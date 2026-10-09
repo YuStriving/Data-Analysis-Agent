@@ -1,4 +1,7 @@
-from agent_backend.orchestration.checkpoint import capture_checkpoint, restore_checkpoint
+from agent_backend.orchestration.checkpoint import (
+    capture_checkpoint,
+    restore_checkpoint,
+)
 from agent_backend.orchestration.state import AgentState
 
 

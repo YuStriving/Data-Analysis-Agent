@@ -7,12 +7,12 @@ from typing import Any
 import pytest
 from pydantic import ValidationError
 
-from agent_backend.capabilities.agent_runtime.execution_control import (
+from agent_backend.agent_runtime.execution_control import (
     AgentSpec,
     NodeSpec,
     ToolAuthorizationGate,
 )
-from agent_backend.capabilities.agent_runtime.tool_calling import (
+from agent_backend.agent_runtime.tool_calling import (
     BusinessTool,
     ToolCallError,
     ToolCallingRuntime,

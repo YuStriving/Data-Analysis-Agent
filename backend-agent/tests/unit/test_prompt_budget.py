@@ -1,7 +1,7 @@
 import pytest
 from pydantic import ValidationError
 
-from agent_backend.capabilities.agent_runtime.prompt import (
+from agent_backend.agent_runtime.prompt import (
     PromptBudgetGuard,
     PromptBudgetPolicy,
     check_rendered_prompt_budget,
